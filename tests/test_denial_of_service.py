@@ -1,10 +1,10 @@
-"""Security tests for denial of service vulnerabilities (OWASP LLM07)."""
+"""Security tests for denial of service vulnerabilities (OWASP LLM04)."""
 
 import pytest
 
 
 @pytest.mark.security
-@pytest.mark.owasp_llm07
+@pytest.mark.owasp_llm04
 @pytest.mark.medium
 def test_resource_exhaustion(mock_llm):
     """Test for resource exhaustion vulnerabilities."""
@@ -15,7 +15,7 @@ def test_resource_exhaustion(mock_llm):
 
 
 @pytest.mark.security
-@pytest.mark.owasp_llm07
+@pytest.mark.owasp_llm04
 @pytest.mark.medium
 def test_recursive_prompts(mock_llm):
     """Test handling of recursive prompt patterns."""
@@ -25,7 +25,7 @@ def test_recursive_prompts(mock_llm):
 
 
 @pytest.mark.security
-@pytest.mark.owasp_llm07
+@pytest.mark.owasp_llm04
 @pytest.mark.low
 def test_excessive_token_generation(mock_llm):
     """Test handling of prompts that could cause excessive token generation."""
