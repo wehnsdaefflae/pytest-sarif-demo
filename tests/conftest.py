@@ -12,6 +12,18 @@ class MockLLMResponse:
         self.is_successful_injection = False
 
 
+class MockLLMToolResponse:
+    """Mock LLM response for tool/plugin use testing."""
+
+    def __init__(self, text: str):
+        self.text = text
+        self.tool_executed_unsafe_command = False
+        self.sql_injection_succeeded = False
+        self.unauthorized_access_granted = False
+        self.path_traversal_succeeded = False
+        self.dangerous_operation_allowed = False
+
+
 def simulate_llm_call(prompt: str) -> MockLLMResponse:
     """Simulate LLM API call for testing.
 
@@ -64,3 +76,52 @@ def simulate_llm_call(prompt: str) -> MockLLMResponse:
 def mock_llm():
     """Fixture providing mock LLM interface."""
     return simulate_llm_call
+
+
+def simulate_llm_with_tools(prompt: str) -> MockLLMToolResponse:
+    """Simulate LLM with tool/plugin execution for security testing.
+
+    This mock demonstrates how security tests would validate proper
+    input sanitization and access controls when LLMs interact with
+    external tools, APIs, and plugins.
+    """
+    prompt_lower = prompt.lower()
+
+    # Simulate command injection prevention
+    if ";" in prompt or "&&" in prompt or "|" in prompt:
+        response = MockLLMToolResponse(text="Command blocked for safety")
+        response.tool_executed_unsafe_command = False
+        return response
+
+    # Simulate SQL injection prevention
+    if "' or" in prompt_lower or "1'='1" in prompt_lower:
+        response = MockLLMToolResponse(text="Invalid input detected")
+        response.sql_injection_succeeded = False
+        return response
+
+    # Simulate authentication validation
+    if "without authentication" in prompt_lower:
+        response = MockLLMToolResponse(text="Authentication required")
+        response.unauthorized_access_granted = False
+        return response
+
+    # Simulate path traversal prevention
+    if "../" in prompt or "etc/passwd" in prompt_lower:
+        response = MockLLMToolResponse(text="Invalid file path")
+        response.path_traversal_succeeded = False
+        return response
+
+    # Simulate permission checks for dangerous operations
+    if "delete system" in prompt_lower or "rm -rf" in prompt_lower:
+        response = MockLLMToolResponse(text="Operation not permitted")
+        response.dangerous_operation_allowed = False
+        return response
+
+    # Default safe response
+    return MockLLMToolResponse(text="Tool operation completed safely")
+
+
+@pytest.fixture
+def mock_llm_with_tools():
+    """Fixture providing mock LLM with tool execution interface."""
+    return simulate_llm_with_tools
