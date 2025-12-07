@@ -19,9 +19,12 @@ This project validates the technical feasibility of creating a pytest-based secu
 - Example security tests for OWASP LLM vulnerabilities:
   - LLM01: Prompt Injection
   - LLM02: Sensitive Information Disclosure
+  - LLM03: Supply Chain Vulnerabilities
   - LLM04: Model Denial of Service
+  - LLM05: Insecure Output Handling
   - LLM06: Insecure Plugin/Tool Use
   - LLM07: System Prompt Leakage
+  - LLM08: Excessive Agency
 - GitHub Actions integration with Security tab display
 
 ## Installation
@@ -58,7 +61,9 @@ pytest tests/ -m security
 
 # Run tests by OWASP category
 pytest tests/ -m owasp_llm01
-pytest tests/ -m owasp_llm04
+pytest tests/ -m owasp_llm03
+pytest tests/ -m owasp_llm05
+pytest tests/ -m owasp_llm08
 
 # Run tests by severity
 pytest tests/ -m critical
@@ -70,24 +75,27 @@ pytest tests/ -m critical
 pytest-sarif-demo/
 ├── .github/
 │   └── workflows/
-│       └── security-tests.yml    # GitHub Actions workflow
+│       └── security-tests.yml           # GitHub Actions workflow
 ├── pytest_sarif/
 │   ├── __init__.py
-│   ├── plugin.py                 # Main pytest plugin
-│   ├── sarif_generator.py        # SARIF generation logic
-│   └── models.py                 # Data models
+│   ├── plugin.py                        # Main pytest plugin
+│   ├── sarif_generator.py               # SARIF generation logic
+│   └── models.py                        # Data models
 ├── tests/
-│   ├── conftest.py                  # Test fixtures and mocks
-│   ├── test_prompt_injection.py     # Prompt injection tests
-│   ├── test_data_leakage.py         # Data leakage tests
-│   ├── test_denial_of_service.py    # DoS tests
-│   ├── test_insecure_plugin_use.py  # Plugin/tool security tests
-│   └── test_system_prompt_leakage.py # System prompt leakage tests
-├── results/                      # Generated SARIF files
-├── pyproject.toml                # Project configuration
-├── pytest.ini                    # Pytest configuration
-├── requirements.txt              # Core dependencies
-└── requirements-dev.txt          # Development dependencies
+│   ├── conftest.py                      # Test fixtures and mocks
+│   ├── test_prompt_injection.py         # Prompt injection tests
+│   ├── test_data_leakage.py             # Data leakage tests
+│   ├── test_supply_chain.py             # Supply chain vulnerability tests
+│   ├── test_denial_of_service.py        # DoS tests
+│   ├── test_insecure_output_handling.py # Output handling security tests
+│   ├── test_insecure_plugin_use.py      # Plugin/tool security tests
+│   ├── test_system_prompt_leakage.py    # System prompt leakage tests
+│   └── test_excessive_agency.py         # Excessive agency tests
+├── results/                             # Generated SARIF files
+├── pyproject.toml                       # Project configuration
+├── pytest.ini                           # Pytest configuration
+├── requirements.txt                     # Core dependencies
+└── requirements-dev.txt                 # Development dependencies
 ```
 
 ## GitHub Actions Integration
@@ -135,9 +143,12 @@ def test_prompt_injection(mock_llm):
 - `@pytest.mark.info` - Informational
 - `@pytest.mark.owasp_llm01` - Prompt Injection
 - `@pytest.mark.owasp_llm02` - Sensitive Information Disclosure
+- `@pytest.mark.owasp_llm03` - Supply Chain Vulnerabilities
 - `@pytest.mark.owasp_llm04` - Model Denial of Service
+- `@pytest.mark.owasp_llm05` - Insecure Output Handling
 - `@pytest.mark.owasp_llm06` - Insecure Plugin/Tool Use
 - `@pytest.mark.owasp_llm07` - System Prompt Leakage
+- `@pytest.mark.owasp_llm08` - Excessive Agency
 
 ### Severity Mapping to SARIF
 
@@ -193,7 +204,10 @@ markers =
     security: security-related tests
     critical: critical severity
     owasp_llm01: OWASP LLM01 - Prompt Injection
+    owasp_llm03: OWASP LLM03 - Supply Chain Vulnerabilities
     owasp_llm04: OWASP LLM04 - Model Denial of Service
+    owasp_llm05: OWASP LLM05 - Insecure Output Handling
+    owasp_llm08: OWASP LLM08 - Excessive Agency
 ```
 
 ### Command Line Options

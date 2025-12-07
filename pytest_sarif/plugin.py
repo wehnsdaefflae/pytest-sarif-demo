@@ -90,7 +90,27 @@ def pytest_configure(config):
     )
     config.addinivalue_line(
         "markers",
+        "owasp_llm03: OWASP LLM03 - Supply Chain Vulnerabilities"
+    )
+    config.addinivalue_line(
+        "markers",
+        "owasp_llm04: OWASP LLM04 - Model Denial of Service"
+    )
+    config.addinivalue_line(
+        "markers",
+        "owasp_llm05: OWASP LLM05 - Insecure Output Handling"
+    )
+    config.addinivalue_line(
+        "markers",
+        "owasp_llm06: OWASP LLM06 - Insecure Plugin/Tool Use"
+    )
+    config.addinivalue_line(
+        "markers",
         "owasp_llm07: OWASP LLM07 - System Prompt Leakage"
+    )
+    config.addinivalue_line(
+        "markers",
+        "owasp_llm08: OWASP LLM08 - Excessive Agency"
     )
 
     # Register plugin instance
