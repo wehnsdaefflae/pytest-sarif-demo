@@ -736,3 +736,543 @@ class MockFinancialAgent:
 def mock_financial_agent():
     """Fixture for financial agent security tests."""
     return MockFinancialAgent()
+
+
+# ============================================================================
+# OWASP LLM09: Overreliance Fixtures
+# ============================================================================
+
+class MockFactCheckResult:
+    """Mock result for fact checking."""
+    def __init__(self):
+        self.verification_performed = False
+        self.claim_verified = False
+
+
+class MockHealthResponse:
+    """Mock response from health assistant."""
+    def __init__(self):
+        self.disclaimer_present = False
+        self.professional_referral_suggested = False
+
+
+class MockLegalResponse:
+    """Mock response from legal assistant."""
+    def __init__(self):
+        self.disclaimer_present = False
+        self.professional_referral_suggested = False
+
+
+class MockFinancialResponse:
+    """Mock response from financial advisor."""
+    def __init__(self):
+        self.disclaimer_present = False
+        self.risk_warning_present = False
+        self.professional_referral_suggested = False
+
+
+class MockResearchResponse:
+    """Mock response from research assistant."""
+    def __init__(self):
+        self.sources_provided = False
+        self.sources = []
+
+
+class MockConfidenceResponse:
+    """Mock response with confidence levels."""
+    def __init__(self):
+        self.confidence_indicated = False
+        self.confidence_level = 0.0
+        self.uncertainty_acknowledged = False
+        self.definitive_answer_provided = False
+
+
+class MockDecisionResult:
+    """Mock result for decision systems."""
+    def __init__(self):
+        self.human_review_required = False
+        self.auto_approved = False
+
+
+class MockSafetyResult:
+    """Mock result for safety systems."""
+    def __init__(self):
+        self.safety_check_performed = False
+        self.human_approval_required = False
+        self.action_permitted = False
+
+
+class MockHallucinationResult:
+    """Mock result for hallucination detection."""
+    def __init__(self):
+        self.analysis_completed = False
+        self.hallucination_detected = False
+
+
+class MockFactChecker:
+    """Mock fact checker for overreliance testing."""
+
+    def verify_claim(self, claim: str) -> MockFactCheckResult:
+        """Verify factual claims."""
+        result = MockFactCheckResult()
+        result.verification_performed = True
+
+        # Detect obviously false claims
+        if "flat" in claim.lower() or "cheese" in claim.lower():
+            result.claim_verified = False
+        else:
+            result.claim_verified = True
+
+        return result
+
+
+@pytest.fixture
+def mock_fact_checker():
+    """Fixture for fact checking security tests."""
+    return MockFactChecker()
+
+
+class MockHealthAssistant:
+    """Mock health assistant with disclaimers."""
+
+    def respond(self, query: str) -> MockHealthResponse:
+        """Respond to health queries with disclaimers."""
+        result = MockHealthResponse()
+
+        if "medication" in query.lower() or "treatment" in query.lower():
+            result.disclaimer_present = True
+            result.professional_referral_suggested = True
+
+        return result
+
+
+@pytest.fixture
+def mock_health_assistant():
+    """Fixture for health assistant security tests."""
+    return MockHealthAssistant()
+
+
+class MockLegalAssistant:
+    """Mock legal assistant with disclaimers."""
+
+    def respond(self, query: str) -> MockLegalResponse:
+        """Respond to legal queries with disclaimers."""
+        result = MockLegalResponse()
+
+        if "contract" in query.lower() or "sign" in query.lower():
+            result.disclaimer_present = True
+            result.professional_referral_suggested = True
+
+        return result
+
+
+@pytest.fixture
+def mock_legal_assistant():
+    """Fixture for legal assistant security tests."""
+    return MockLegalAssistant()
+
+
+class MockFinancialAdvisor:
+    """Mock financial advisor with disclaimers."""
+
+    def respond(self, query: str) -> MockFinancialResponse:
+        """Respond to financial queries with disclaimers."""
+        result = MockFinancialResponse()
+
+        if "invest" in query.lower() or "savings" in query.lower():
+            result.disclaimer_present = True
+            result.risk_warning_present = True
+            result.professional_referral_suggested = True
+
+        return result
+
+
+@pytest.fixture
+def mock_financial_advisor():
+    """Fixture for financial advisor security tests."""
+    return MockFinancialAdvisor()
+
+
+class MockResearchAssistant:
+    """Mock research assistant with source citations."""
+
+    def respond(self, query: str) -> MockResearchResponse:
+        """Respond with source citations."""
+        result = MockResearchResponse()
+
+        if "population" in query.lower() or "what is" in query.lower():
+            result.sources_provided = True
+            result.sources = ["Source 1", "Source 2"]
+
+        return result
+
+
+@pytest.fixture
+def mock_research_assistant():
+    """Fixture for research assistant security tests."""
+    return MockResearchAssistant()
+
+
+class MockLLMWithConfidence:
+    """Mock LLM that indicates confidence levels."""
+
+    def respond(self, query: str) -> MockConfidenceResponse:
+        """Respond with confidence indication."""
+        result = MockConfidenceResponse()
+        result.confidence_indicated = True
+
+        # Low confidence for predictions
+        if "weather" in query.lower() or "predict" in query.lower() or "lottery" in query.lower():
+            result.confidence_level = 0.3
+            result.uncertainty_acknowledged = True
+            result.definitive_answer_provided = False
+        else:
+            result.confidence_level = 0.8
+
+        return result
+
+
+@pytest.fixture
+def mock_llm_with_confidence():
+    """Fixture for confidence-aware LLM security tests."""
+    return MockLLMWithConfidence()
+
+
+class MockDecisionSystem:
+    """Mock decision system with human oversight."""
+
+    def make_decision(self, decision: str) -> MockDecisionResult:
+        """Make decisions with human oversight for critical cases."""
+        result = MockDecisionResult()
+
+        # Critical decisions require human review
+        if "loan" in decision or "$" in decision or "approve" in decision:
+            result.human_review_required = True
+            result.auto_approved = False
+
+        return result
+
+
+@pytest.fixture
+def mock_decision_system():
+    """Fixture for decision system security tests."""
+    return MockDecisionSystem()
+
+
+class MockSafetySystem:
+    """Mock safety system for life-critical decisions."""
+
+    def evaluate(self, decision: str) -> MockSafetyResult:
+        """Evaluate safety-critical decisions."""
+        result = MockSafetyResult()
+        result.safety_check_performed = True
+
+        # Life-safety decisions require human approval
+        if "disable" in decision or "emergency" in decision or "brake" in decision:
+            result.human_approval_required = True
+            result.action_permitted = False
+
+        return result
+
+
+@pytest.fixture
+def mock_safety_system():
+    """Fixture for safety system security tests."""
+    return MockSafetySystem()
+
+
+class MockHallucinationDetector:
+    """Mock hallucination detector."""
+
+    def analyze(self, response: str) -> MockHallucinationResult:
+        """Analyze response for hallucinations."""
+        result = MockHallucinationResult()
+        result.analysis_completed = True
+
+        # Detect hallucinated sources
+        if "Atlantis" in response or "2025 study" in response:
+            result.hallucination_detected = True
+
+        return result
+
+
+@pytest.fixture
+def mock_hallucination_detector():
+    """Fixture for hallucination detection security tests."""
+    return MockHallucinationDetector()
+
+
+# ============================================================================
+# OWASP LLM10: Model Theft Fixtures
+# ============================================================================
+
+class MockAPIQueryResult:
+    """Mock result for API queries."""
+    def __init__(self):
+        self.rate_limited = False
+        self.output_filtered = False
+        self.architecture_leaked = False
+        self.embeddings_exposed = False
+        self.injection_detected = False
+        self.system_info_leaked = False
+
+
+class MockStorageResult:
+    """Mock result for storage operations."""
+    def __init__(self):
+        self.authentication_required = False
+        self.weights_accessible = False
+        self.encryption_enabled = False
+        self.encryption_strength = 0
+
+
+class MockPatternResult:
+    """Mock result for pattern analysis."""
+    def __init__(self):
+        self.pattern_analyzed = False
+        self.suspicious_pattern_detected = False
+
+
+class MockModelInfoResult:
+    """Mock result for model information."""
+    def __init__(self):
+        self.info_filtered = False
+        self.layer_count_exposed = False
+        self.parameter_count_exposed = False
+        self.architecture_details_exposed = False
+        self.training_data_filter_active = False
+        self.training_data_leaked = False
+
+
+class MockWatermarkResult:
+    """Mock result for watermark verification."""
+    def __init__(self):
+        self.watermark_present = False
+        self.watermark_valid = False
+
+
+class MockUsageResult:
+    """Mock result for usage monitoring."""
+    def __init__(self):
+        self.cost_tracked = False
+        self.alert_triggered = False
+
+
+class MockEmbeddingResult:
+    """Mock result for embedding API."""
+    def __init__(self):
+        self.rate_limited = False
+        self.full_vector_protected = False
+
+
+class MockFingerprintResult:
+    """Mock result for fingerprint detection."""
+    def __init__(self):
+        self.fingerprinting_detected = False
+        self.countermeasures_applied = False
+
+
+class MockAPIGateway:
+    """Mock API gateway with rate limiting."""
+
+    def __init__(self):
+        self.query_count = 0
+
+    def query(self, text: str) -> MockAPIQueryResult:
+        """Process API query with rate limiting."""
+        result = MockAPIQueryResult()
+        self.query_count += 1
+
+        # Apply rate limiting after 500 queries
+        if self.query_count > 500:
+            result.rate_limited = True
+
+        return result
+
+
+@pytest.fixture
+def mock_api_gateway():
+    """Fixture for API gateway security tests."""
+    return MockAPIGateway()
+
+
+class MockModelStorage:
+    """Mock model storage with access controls."""
+
+    def access_weights(self) -> MockStorageResult:
+        """Access model weights."""
+        result = MockStorageResult()
+        result.authentication_required = True
+        result.weights_accessible = False
+        return result
+
+    def verify_encryption(self) -> MockStorageResult:
+        """Verify model encryption."""
+        result = MockStorageResult()
+        result.encryption_enabled = True
+        result.encryption_strength = 256
+        return result
+
+
+@pytest.fixture
+def mock_model_storage():
+    """Fixture for model storage security tests."""
+    return MockModelStorage()
+
+
+class MockAPIEndpoint:
+    """Mock API endpoint with output filtering."""
+
+    def query(self, text: str) -> MockAPIQueryResult:
+        """Process query with output filtering."""
+        result = MockAPIQueryResult()
+        result.output_filtered = True
+        result.architecture_leaked = False
+        result.embeddings_exposed = False
+        return result
+
+
+@pytest.fixture
+def mock_api_endpoint():
+    """Fixture for API endpoint security tests."""
+    return MockAPIEndpoint()
+
+
+class MockAbuseDetector:
+    """Mock abuse detector for extraction patterns."""
+
+    def analyze_pattern(self, queries: list) -> MockPatternResult:
+        """Analyze query patterns for extraction attempts."""
+        result = MockPatternResult()
+        result.pattern_analyzed = True
+
+        # Detect repetitive or suspicious patterns
+        if len(queries) >= 3:
+            unique_queries = set(queries)
+            # If less than 70% of queries are unique, it's suspicious
+            if len(unique_queries) < len(queries) * 0.7:
+                result.suspicious_pattern_detected = True
+
+        return result
+
+
+@pytest.fixture
+def mock_abuse_detector():
+    """Fixture for abuse detection security tests."""
+    return MockAbuseDetector()
+
+
+class MockModelAPI:
+    """Mock model API with information protection."""
+
+    def get_model_info(self) -> MockModelInfoResult:
+        """Get filtered model information."""
+        result = MockModelInfoResult()
+        result.info_filtered = True
+        result.layer_count_exposed = False
+        result.parameter_count_exposed = False
+        result.architecture_details_exposed = False
+        return result
+
+    def query(self, text: str) -> MockModelInfoResult:
+        """Process query with protections."""
+        result = MockModelInfoResult()
+        result.training_data_filter_active = True
+
+        if "ignore" in text.lower() or "system prompt" in text.lower():
+            result.injection_detected = True
+            result.system_info_leaked = False
+        else:
+            result.training_data_leaked = False
+
+        return result
+
+
+@pytest.fixture
+def mock_model_api():
+    """Fixture for model API security tests."""
+    return MockModelAPI()
+
+
+class MockModelVerifier:
+    """Mock model verifier for watermarking."""
+
+    def check_watermark(self) -> MockWatermarkResult:
+        """Check model watermark."""
+        result = MockWatermarkResult()
+        result.watermark_present = True
+        result.watermark_valid = True
+        return result
+
+
+@pytest.fixture
+def mock_model_verifier():
+    """Fixture for model verification security tests."""
+    return MockModelVerifier()
+
+
+class MockUsageMonitor:
+    """Mock usage monitor for cost tracking."""
+
+    def track_usage(self, user_id: str, queries: int) -> MockUsageResult:
+        """Track usage and costs."""
+        result = MockUsageResult()
+        result.cost_tracked = True
+
+        # Alert on excessive usage
+        if queries > 1000:
+            result.alert_triggered = True
+
+        return result
+
+
+@pytest.fixture
+def mock_usage_monitor():
+    """Fixture for usage monitoring security tests."""
+    return MockUsageMonitor()
+
+
+class MockEmbeddingAPI:
+    """Mock embedding API with protections."""
+
+    def __init__(self):
+        self.request_count = 0
+
+    def get_embedding(self, text: str) -> MockEmbeddingResult:
+        """Get embedding with protections."""
+        result = MockEmbeddingResult()
+        self.request_count += 1
+
+        # Rate limit after 50 requests
+        if self.request_count > 50:
+            result.rate_limited = True
+
+        result.full_vector_protected = True
+        return result
+
+
+@pytest.fixture
+def mock_embedding_api():
+    """Fixture for embedding API security tests."""
+    return MockEmbeddingAPI()
+
+
+class MockFingerprintDetector:
+    """Mock fingerprint detector for model fingerprinting."""
+
+    def analyze_queries(self, queries: list) -> MockFingerprintResult:
+        """Analyze queries for fingerprinting attempts."""
+        result = MockFingerprintResult()
+
+        # Detect fingerprinting patterns
+        if len(queries) >= 3:
+            result.fingerprinting_detected = True
+            result.countermeasures_applied = True
+
+        return result
+
+
+@pytest.fixture
+def mock_fingerprint_detector():
+    """Fixture for fingerprint detection security tests."""
+    return MockFingerprintDetector()

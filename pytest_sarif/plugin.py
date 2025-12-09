@@ -112,6 +112,14 @@ def pytest_configure(config):
         "markers",
         "owasp_llm08: OWASP LLM08 - Excessive Agency"
     )
+    config.addinivalue_line(
+        "markers",
+        "owasp_llm09: OWASP LLM09 - Overreliance"
+    )
+    config.addinivalue_line(
+        "markers",
+        "owasp_llm10: OWASP LLM10 - Model Theft"
+    )
 
     # Register plugin instance
     if config.getoption("--sarif-output", None) is not None or \

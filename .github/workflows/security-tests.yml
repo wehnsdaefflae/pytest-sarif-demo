@@ -29,7 +29,7 @@ jobs:
         pip install -e .
         pip install -r requirements-dev.txt
 
-    - name: Run security tests
+    - name: Run security tests (OWASP Top 10 for LLM Applications)
       run: |
         pytest tests/ --sarif-output=results/pytest-results.sarif -v
 
