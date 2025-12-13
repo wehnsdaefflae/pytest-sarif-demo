@@ -2,10 +2,12 @@
 
 import pytest
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Dict
+from collections import defaultdict
 
 from .sarif_generator import SARIFGenerator
 from .models import TestResult
+from .owasp_metadata import get_owasp_category, get_owasp_markers_from_test
 
 
 class SARIFPlugin:
@@ -46,6 +48,74 @@ class SARIFPlugin:
 
             self.results.append(test_result)
 
+    def _generate_statistics(self) -> Dict:
+        """Generate statistics about OWASP category coverage."""
+        stats = {
+            "total_tests": len(self.results),
+            "failed_tests": sum(1 for r in self.results if r.outcome == "failed"),
+            "passed_tests": sum(1 for r in self.results if r.outcome == "passed"),
+            "owasp_categories": defaultdict(lambda: {"total": 0, "failed": 0, "passed": 0}),
+            "severity_distribution": defaultdict(int),
+        }
+
+        for result in self.results:
+            # Track OWASP category statistics
+            owasp_markers = get_owasp_markers_from_test(result.markers)
+            for marker in owasp_markers:
+                category = get_owasp_category(marker)
+                if category:
+                    stats["owasp_categories"][category.id]["total"] += 1
+                    if result.outcome == "failed":
+                        stats["owasp_categories"][category.id]["failed"] += 1
+                    elif result.outcome == "passed":
+                        stats["owasp_categories"][category.id]["passed"] += 1
+
+            # Track severity distribution
+            for marker in ["critical", "high", "medium", "low", "info"]:
+                if marker in result.markers:
+                    stats["severity_distribution"][marker] += 1
+                    break
+
+        return stats
+
+    def _print_summary(self, stats: Dict):
+        """Print comprehensive test summary with OWASP categories."""
+        print("\n" + "=" * 70)
+        print("OWASP LLM Security Test Summary")
+        print("=" * 70)
+
+        # Overall statistics
+        print(f"\nTotal Tests:  {stats['total_tests']}")
+        print(f"Passed:       {stats['passed_tests']}")
+        print(f"Failed:       {stats['failed_tests']}")
+
+        # Severity distribution
+        if stats["severity_distribution"]:
+            print("\nSeverity Distribution:")
+            for severity in ["critical", "high", "medium", "low", "info"]:
+                count = stats["severity_distribution"].get(severity, 0)
+                if count > 0:
+                    print(f"  {severity.capitalize():12s} {count:3d}")
+
+        # OWASP category breakdown
+        if stats["owasp_categories"]:
+            print("\nOWASP LLM Categories:")
+            print(f"  {'Category':<8} {'Name':<35} {'Total':>5} {'Pass':>5} {'Fail':>5}")
+            print("  " + "-" * 65)
+
+            for category_id in sorted(stats["owasp_categories"].keys()):
+                cat_stats = stats["owasp_categories"][category_id]
+                category = get_owasp_category(f"owasp_{category_id.lower()}")
+                name = category.name if category else "Unknown"
+
+                print(
+                    f"  {category_id:<8} {name:<35} "
+                    f"{cat_stats['total']:>5} {cat_stats['passed']:>5} {cat_stats['failed']:>5}"
+                )
+
+        print(f"\nSARIF Report: {self.sarif_output}")
+        print("=" * 70)
+
     @pytest.hookimpl(trylast=True)
     def pytest_sessionfinish(self, session, exitstatus):
         """Generate SARIF report at end of session."""
@@ -62,10 +132,9 @@ class SARIFPlugin:
             self.sarif_output.parent.mkdir(parents=True, exist_ok=True)
             self.sarif_output.write_text(sarif_report, encoding="utf-8")
 
-            # Print summary
-            failed_count = sum(1 for r in self.results if r.outcome == "failed")
-            print(f"\nSARIF report written to: {self.sarif_output}")
-            print(f"Total tests: {len(self.results)}, Failed: {failed_count}")
+            # Generate and print statistics
+            stats = self._generate_statistics()
+            self._print_summary(stats)
 
 
 @pytest.hookimpl(tryfirst=True)
