@@ -8,6 +8,7 @@ from collections import defaultdict
 from .sarif_generator import SARIFGenerator
 from .models import TestResult
 from .owasp_metadata import get_owasp_category, get_owasp_markers_from_test
+from .report_manager import ReportManager
 
 
 class SARIFPlugin:
@@ -17,12 +18,27 @@ class SARIFPlugin:
         self.config = config
         self.results: List[TestResult] = []
         self.sarif_output: Optional[Path] = None
+        self.report_formats: List[str] = []
+        self.report_dir: Path = Path("results")
 
         # Get SARIF output path
         sarif_output = config.getoption("--sarif-output", None) or \
                       config.getini("sarif_output") or \
                       "results/pytest-results.sarif"
         self.sarif_output = Path(sarif_output)
+
+        # Get report formats
+        formats_option = config.getoption("--report-formats", None) or \
+                        config.getini("report_formats") or \
+                        ""
+        if formats_option:
+            self.report_formats = [f.strip() for f in formats_option.split(",")]
+
+        # Get report directory
+        report_dir = config.getoption("--report-dir", None) or \
+                    config.getini("report_dir") or \
+                    "results"
+        self.report_dir = Path(report_dir)
 
     @pytest.hookimpl(hookwrapper=True)
     def pytest_runtest_makereport(self, item, call):
@@ -118,23 +134,44 @@ class SARIFPlugin:
 
     @pytest.hookimpl(trylast=True)
     def pytest_sessionfinish(self, session, exitstatus):
-        """Generate SARIF report at end of session."""
+        """Generate reports at end of session."""
         if self.results:
-            generator = SARIFGenerator(
-                tool_name="pytest-sarif-demo",
-                tool_version="0.1.0",
-                source_root=Path.cwd()
-            )
-
-            sarif_report = generator.generate(self.results)
-
-            # Write to file
-            self.sarif_output.parent.mkdir(parents=True, exist_ok=True)
-            self.sarif_output.write_text(sarif_report, encoding="utf-8")
-
             # Generate and print statistics
             stats = self._generate_statistics()
             self._print_summary(stats)
+
+            # Generate reports using ReportManager
+            report_manager = ReportManager(
+                tool_name="pytest-sarif-demo",
+                tool_version="0.1.0",
+                source_root=Path.cwd(),
+                output_dir=self.report_dir
+            )
+
+            # Always generate SARIF (legacy support)
+            sarif_report = SARIFGenerator(
+                tool_name="pytest-sarif-demo",
+                tool_version="0.1.0",
+                source_root=Path.cwd()
+            ).generate(self.results)
+
+            self.sarif_output.parent.mkdir(parents=True, exist_ok=True)
+            self.sarif_output.write_text(sarif_report, encoding="utf-8")
+
+            # Generate additional report formats if specified
+            if self.report_formats:
+                generated_files = report_manager.generate_reports(
+                    results=self.results,
+                    formats=self.report_formats
+                )
+
+                # Print information about generated reports
+                print("\n" + "=" * 70)
+                print("Generated Additional Reports:")
+                print("=" * 70)
+                for format_name, file_path in generated_files.items():
+                    print(f"  {format_name.upper():12s} {file_path}")
+                print("=" * 70)
 
 
 @pytest.hookimpl(tryfirst=True)
@@ -201,7 +238,7 @@ def pytest_configure(config):
 
 def pytest_addoption(parser):
     """Add command-line options."""
-    group = parser.getgroup("sarif", "SARIF report generation")
+    group = parser.getgroup("sarif", "Security test report generation")
     group.addoption(
         "--sarif-output",
         action="store",
@@ -209,9 +246,33 @@ def pytest_addoption(parser):
         default=None,
         help="Path to SARIF output file (default: results/pytest-results.sarif)"
     )
+    group.addoption(
+        "--report-formats",
+        action="store",
+        dest="report_formats",
+        default=None,
+        help="Comma-separated list of report formats to generate (sarif,html,json,markdown)"
+    )
+    group.addoption(
+        "--report-dir",
+        action="store",
+        dest="report_dir",
+        default=None,
+        help="Directory for output reports (default: results)"
+    )
 
     parser.addini(
         "sarif_output",
         "Path to SARIF output file",
         default="results/pytest-results.sarif"
+    )
+    parser.addini(
+        "report_formats",
+        "Comma-separated list of report formats to generate",
+        default=""
+    )
+    parser.addini(
+        "report_dir",
+        "Directory for output reports",
+        default="results"
     )
