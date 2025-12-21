@@ -3,7 +3,7 @@
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from collections import defaultdict
 
 from .models import TestResult
@@ -17,9 +17,22 @@ class HTMLReportGenerator:
         self.tool_name = tool_name
         self.tool_version = tool_version
 
-    def generate(self, results: List[TestResult]) -> str:
-        """Generate HTML report from test results."""
+    def generate(self, results: List[TestResult], trend_analytics: Optional[Dict] = None) -> str:
+        """Generate HTML report from test results.
+
+        Args:
+            results: List of test results
+            trend_analytics: Optional trend analytics data
+
+        Returns:
+            HTML formatted report
+        """
         stats = self._calculate_statistics(results)
+
+        # Generate trend section HTML if analytics available
+        trend_section = ""
+        if trend_analytics and trend_analytics.get("has_history"):
+            trend_section = self._generate_trend_section(trend_analytics)
 
         html = f"""<!DOCTYPE html>
 <html lang="en">
@@ -41,6 +54,7 @@ class HTMLReportGenerator:
             </div>
         </header>
 
+        {trend_section}
         {self._generate_summary_section(stats)}
         {self._generate_severity_section(stats)}
         {self._generate_owasp_section(stats, results)}
@@ -271,6 +285,88 @@ class HTMLReportGenerator:
             <div class="test-list">
                 {tests_html}
             </div>
+        </section>"""
+
+    def _generate_trend_section(self, trend_analytics: Dict) -> str:
+        """Generate trend analytics section with visualizations."""
+        comparison = trend_analytics.get("comparison", {})
+        risk = trend_analytics.get("risk_score", {})
+        flakiness = trend_analytics.get("flakiness", {})
+        trends = trend_analytics.get("trends", {})
+
+        # Determine trend indicator
+        trend_direction = comparison.get("trend", "stable")
+        trend_icon = {"improving": "↑", "degrading": "↓", "stable": "→"}[trend_direction]
+        trend_class = f"trend-{trend_direction}"
+
+        # Risk level styling
+        risk_level = risk.get("level", "unknown")
+        risk_score = risk.get("score", 0)
+        risk_class = f"risk-{risk_level}"
+
+        # Flaky tests HTML
+        flaky_html = ""
+        if flakiness.get("count", 0) > 0:
+            flaky_tests = flakiness.get("flaky_tests", [])[:5]  # Show top 5
+            flaky_items = ""
+            for flaky_test in flaky_tests:
+                test_name = flaky_test["test"].split("::")[-1]
+                fail_rate = flaky_test["fail_rate"]
+                flaky_items += f"""
+                <div class="flaky-item">
+                    <code>{test_name}</code>
+                    <span class="fail-rate">{fail_rate}% failure rate</span>
+                </div>"""
+
+            flaky_html = f"""
+            <div class="flaky-tests-alert">
+                <h4>⚠ Flaky Tests Detected ({flakiness['count']})</h4>
+                <div class="flaky-list">{flaky_items}</div>
+            </div>"""
+
+        pass_rate_trend = trends.get("pass_rate_trend", {})
+
+        return f"""
+        <section class="trends">
+            <h2>Trend Analytics</h2>
+            <div class="trend-grid">
+                <div class="trend-card {trend_class}">
+                    <div class="trend-icon">{trend_icon}</div>
+                    <div class="trend-content">
+                        <div class="trend-label">Trend Direction</div>
+                        <div class="trend-value">{trend_direction.capitalize()}</div>
+                        <div class="trend-detail">Pass Rate: {comparison.get('pass_rate_change', 0):+.2f}%</div>
+                    </div>
+                </div>
+
+                <div class="trend-card {risk_class}">
+                    <div class="risk-score">{risk_score:.0f}</div>
+                    <div class="trend-content">
+                        <div class="trend-label">Risk Score</div>
+                        <div class="trend-value">{risk_level.upper()}</div>
+                        <div class="trend-detail">Based on {trend_analytics.get('total_runs', 0)} runs</div>
+                    </div>
+                </div>
+
+                <div class="trend-card">
+                    <div class="trend-stat">{pass_rate_trend.get('current', 0):.1f}%</div>
+                    <div class="trend-content">
+                        <div class="trend-label">Current Pass Rate</div>
+                        <div class="trend-value">{pass_rate_trend.get('direction', 'stable').capitalize()}</div>
+                        <div class="trend-detail">Avg: {pass_rate_trend.get('average', 0):.1f}%</div>
+                    </div>
+                </div>
+
+                <div class="trend-card">
+                    <div class="trend-stat">{comparison.get('failed_tests_change', 0):+d}</div>
+                    <div class="trend-content">
+                        <div class="trend-label">Failed Tests Change</div>
+                        <div class="trend-value">vs. Previous Run</div>
+                        <div class="trend-detail">Duration: {comparison.get('duration_change', 0):+.2f}s</div>
+                    </div>
+                </div>
+            </div>
+            {flaky_html}
         </section>"""
 
     def _get_test_severity(self, result: TestResult) -> str:
@@ -627,12 +723,155 @@ section h2 {
     font-size: 1.2rem;
 }
 
+/* Trend Analytics Styles */
+.trends {
+    background: #f8f9fa;
+}
+
+.trend-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+.trend-card {
+    background: white;
+    border-radius: 8px;
+    padding: 20px;
+    border-left: 4px solid #6c757d;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.trend-card.trend-improving {
+    border-left-color: #28a745;
+    background: #f1f9f3;
+}
+
+.trend-card.trend-degrading {
+    border-left-color: #dc3545;
+    background: #fef5f5;
+}
+
+.trend-card.trend-stable {
+    border-left-color: #17a2b8;
+    background: #f1f9fb;
+}
+
+.trend-card.risk-low {
+    border-left-color: #28a745;
+}
+
+.trend-card.risk-medium {
+    border-left-color: #ffc107;
+    background: #fffbf0;
+}
+
+.trend-card.risk-high {
+    border-left-color: #fd7e14;
+    background: #fff5ed;
+}
+
+.trend-card.risk-critical {
+    border-left-color: #dc3545;
+    background: #fef5f5;
+}
+
+.trend-icon {
+    font-size: 3rem;
+    line-height: 1;
+}
+
+.risk-score {
+    font-size: 3rem;
+    font-weight: bold;
+    line-height: 1;
+}
+
+.trend-stat {
+    font-size: 2.5rem;
+    font-weight: bold;
+    line-height: 1;
+}
+
+.trend-content {
+    flex: 1;
+}
+
+.trend-label {
+    font-size: 0.85rem;
+    color: #6c757d;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 5px;
+}
+
+.trend-value {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: #2c3e50;
+    margin-bottom: 3px;
+}
+
+.trend-detail {
+    font-size: 0.85rem;
+    color: #6c757d;
+}
+
+.flaky-tests-alert {
+    background: #fff3cd;
+    border: 2px solid #ffc107;
+    border-radius: 8px;
+    padding: 20px;
+    margin-top: 20px;
+}
+
+.flaky-tests-alert h4 {
+    color: #856404;
+    margin-bottom: 15px;
+    font-size: 1.1rem;
+}
+
+.flaky-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.flaky-item {
+    background: white;
+    padding: 12px;
+    border-radius: 4px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-left: 3px solid #ffc107;
+}
+
+.flaky-item code {
+    font-size: 0.9rem;
+    color: #2c3e50;
+}
+
+.fail-rate {
+    font-size: 0.85rem;
+    color: #856404;
+    font-weight: 600;
+}
+
 @media (max-width: 768px) {
     .stats-grid {
         grid-template-columns: 1fr 1fr;
     }
 
     .owasp-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .trend-grid {
         grid-template-columns: 1fr;
     }
 

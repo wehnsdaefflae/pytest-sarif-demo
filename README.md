@@ -16,6 +16,8 @@ This project validates the technical feasibility of creating a pytest-based secu
 - Custom pytest plugin that hooks into the test execution lifecycle
 - Automatic generation of SARIF (Static Analysis Results Interchange Format) reports
 - Support for custom security test markers and severity levels
+- **Historical trend tracking and analytics** with risk scoring and flaky test detection
+- **Multi-format reporting** (SARIF, HTML, JSON, Markdown) with rich visualizations
 - Comprehensive security tests for complete OWASP Top 10 for LLM Applications:
   - LLM01: Prompt Injection
   - LLM02: Sensitive Information Disclosure
@@ -229,8 +231,68 @@ markers =
 # Specify custom SARIF output path
 pytest --sarif-output=custom/path/report.sarif
 
+# Generate multiple report formats
+pytest --report-formats=html,json,markdown --report-dir=results
+
+# Disable trend tracking (enabled by default)
+pytest --disable-trends
+
 # Combine with other pytest options
 pytest -v --tb=short --sarif-output=results/report.sarif
+```
+
+## Trend Tracking and Analytics
+
+The plugin automatically tracks test results over time, providing valuable insights into your security posture:
+
+### Features
+
+- **Historical Tracking**: Stores last 100 test runs for trend analysis
+- **Risk Scoring**: Calculates security risk scores (0-100) based on failures and severity
+- **Flaky Test Detection**: Identifies tests that alternate between pass/fail
+- **Trend Analysis**: Shows if security posture is improving, degrading, or stable
+- **OWASP Category Trends**: Tracks pass rates for each OWASP category over time
+
+### Trend Analytics Output
+
+When running tests, you'll see trend analysis in the console output:
+
+```
+Trend Analysis:
+  Total Runs:   15
+  Trend:        IMPROVING
+  Pass Rate:    +5.23%
+  Risk Level:   LOW (15.2/100)
+  ⚠ Flaky:      2 test(s) detected
+```
+
+### Understanding Risk Levels
+
+Risk scores are calculated based on failure rates and test severity:
+
+- **0-20**: Low risk - Minimal security concerns
+- **21-50**: Medium risk - Some security issues detected
+- **51-80**: High risk - Significant security vulnerabilities
+- **81-100**: Critical risk - Severe security problems
+
+### Trend Data Storage
+
+Historical data is stored in `results/test-history.json` (configurable). The file automatically maintains the last 100 test runs to prevent unbounded growth.
+
+### Viewing Trends in Reports
+
+Trend analytics are automatically included in:
+
+- **HTML Reports**: Visual trend cards showing direction, risk score, and flaky tests
+- **JSON Reports**: Complete trend analytics data under the `trend_analytics` key
+- **Console Output**: Summary of current trends and comparison with previous run
+
+### Disabling Trend Tracking
+
+If you don't want historical tracking:
+
+```bash
+pytest --disable-trends
 ```
 
 ## Development

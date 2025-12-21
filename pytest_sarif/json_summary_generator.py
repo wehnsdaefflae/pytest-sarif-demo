@@ -2,7 +2,7 @@
 
 import json
 from datetime import datetime
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from collections import defaultdict
 
 from .models import TestResult
@@ -16,14 +16,22 @@ class JSONSummaryGenerator:
         self.tool_name = tool_name
         self.tool_version = tool_version
 
-    def generate(self, results: List[TestResult]) -> str:
-        """Generate JSON summary from test results."""
+    def generate(self, results: List[TestResult], trend_analytics: Optional[Dict] = None) -> str:
+        """Generate JSON summary from test results.
+
+        Args:
+            results: List of test results
+            trend_analytics: Optional trend analytics data
+
+        Returns:
+            JSON formatted summary report
+        """
         summary = {
             "metadata": {
                 "tool": self.tool_name,
                 "version": self.tool_version,
                 "generated_at": datetime.now().isoformat(),
-                "report_format": "json-summary-v1.0"
+                "report_format": "json-summary-v1.1"
             },
             "summary": self._generate_summary(results),
             "severity_distribution": self._generate_severity_distribution(results),
@@ -31,6 +39,10 @@ class JSONSummaryGenerator:
             "test_results": self._generate_test_results(results),
             "failures": self._generate_failures(results)
         }
+
+        # Add trend analytics if available
+        if trend_analytics and trend_analytics.get("has_history"):
+            summary["trend_analytics"] = trend_analytics
 
         return json.dumps(summary, indent=2, ensure_ascii=False)
 

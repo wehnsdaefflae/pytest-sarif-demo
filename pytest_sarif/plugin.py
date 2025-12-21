@@ -9,6 +9,7 @@ from .sarif_generator import SARIFGenerator
 from .models import TestResult
 from .owasp_metadata import get_owasp_category, get_owasp_markers_from_test
 from .report_manager import ReportManager
+from .trend_tracker import TrendTracker
 
 
 class SARIFPlugin:
@@ -20,6 +21,7 @@ class SARIFPlugin:
         self.sarif_output: Optional[Path] = None
         self.report_formats: List[str] = []
         self.report_dir: Path = Path("results")
+        self.enable_trends: bool = True
 
         # Get SARIF output path
         sarif_output = config.getoption("--sarif-output", None) or \
@@ -39,6 +41,14 @@ class SARIFPlugin:
                     config.getini("report_dir") or \
                     "results"
         self.report_dir = Path(report_dir)
+
+        # Enable/disable trend tracking
+        self.enable_trends = config.getoption("--enable-trends", True)
+        if self.enable_trends:
+            trend_file = self.report_dir / "test-history.json"
+            self.trend_tracker = TrendTracker(trend_file)
+        else:
+            self.trend_tracker = None
 
     @pytest.hookimpl(hookwrapper=True)
     def pytest_runtest_makereport(self, item, call):
@@ -94,8 +104,8 @@ class SARIFPlugin:
 
         return stats
 
-    def _print_summary(self, stats: Dict):
-        """Print comprehensive test summary with OWASP categories."""
+    def _print_summary(self, stats: Dict, trend_analytics: Optional[Dict] = None):
+        """Print comprehensive test summary with OWASP categories and trends."""
         print("\n" + "=" * 70)
         print("OWASP LLM Security Test Summary")
         print("=" * 70)
@@ -104,6 +114,22 @@ class SARIFPlugin:
         print(f"\nTotal Tests:  {stats['total_tests']}")
         print(f"Passed:       {stats['passed_tests']}")
         print(f"Failed:       {stats['failed_tests']}")
+
+        # Trend analytics summary
+        if trend_analytics and trend_analytics.get("has_history"):
+            comparison = trend_analytics.get("comparison", {})
+            risk = trend_analytics.get("risk_score", {})
+
+            print(f"\nTrend Analysis:")
+            print(f"  Total Runs:   {trend_analytics['total_runs']}")
+            print(f"  Trend:        {comparison.get('trend', 'unknown').upper()}")
+            print(f"  Pass Rate:    {comparison.get('pass_rate_change', 0):+.2f}%")
+            print(f"  Risk Level:   {risk.get('level', 'unknown').upper()} ({risk.get('score', 0):.1f}/100)")
+
+            # Show flaky tests warning
+            flakiness = trend_analytics.get("flakiness", {})
+            if flakiness.get("count", 0) > 0:
+                print(f"  ⚠ Flaky:      {flakiness['count']} test(s) detected")
 
         # Severity distribution
         if stats["severity_distribution"]:
@@ -138,7 +164,17 @@ class SARIFPlugin:
         if self.results:
             # Generate and print statistics
             stats = self._generate_statistics()
-            self._print_summary(stats)
+
+            # Get trend analytics if enabled
+            trend_analytics = None
+            if self.trend_tracker:
+                trend_analytics = self.trend_tracker.get_trend_analytics(self.results)
+
+            self._print_summary(stats, trend_analytics)
+
+            # Save test results to history for trend tracking
+            if self.trend_tracker:
+                self.trend_tracker.save_test_run(self.results)
 
             # Generate reports using ReportManager
             report_manager = ReportManager(
@@ -160,9 +196,11 @@ class SARIFPlugin:
 
             # Generate additional report formats if specified
             if self.report_formats:
+                # Pass trend analytics to report manager for inclusion in reports
                 generated_files = report_manager.generate_reports(
                     results=self.results,
-                    formats=self.report_formats
+                    formats=self.report_formats,
+                    trend_analytics=trend_analytics
                 )
 
                 # Print information about generated reports
@@ -259,6 +297,19 @@ def pytest_addoption(parser):
         dest="report_dir",
         default=None,
         help="Directory for output reports (default: results)"
+    )
+    group.addoption(
+        "--enable-trends",
+        action="store_true",
+        dest="enable_trends",
+        default=True,
+        help="Enable historical trend tracking (default: True)"
+    )
+    group.addoption(
+        "--disable-trends",
+        action="store_false",
+        dest="enable_trends",
+        help="Disable historical trend tracking"
     )
 
     parser.addini(

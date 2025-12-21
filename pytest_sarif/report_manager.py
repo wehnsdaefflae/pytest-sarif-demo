@@ -47,7 +47,8 @@ class ReportManager:
         self,
         results: List[TestResult],
         formats: List[str] = None,
-        custom_paths: dict = None
+        custom_paths: dict = None,
+        trend_analytics: Optional[dict] = None
     ) -> dict:
         """Generate reports in specified formats.
 
@@ -55,6 +56,7 @@ class ReportManager:
             results: List of test results
             formats: List of format names to generate (default: all)
             custom_paths: Optional dict mapping format names to custom file paths
+            trend_analytics: Optional trend analytics data to include in reports
 
         Returns:
             Dict mapping format names to generated file paths
@@ -85,7 +87,7 @@ class ReportManager:
         if "html" in formats:
             html_path = custom_paths.get("html", self.output_dir / "pytest-results.html")
             try:
-                html_content = self.html_generator.generate(results)
+                html_content = self.html_generator.generate(results, trend_analytics)
                 self._write_report(html_path, html_content)
                 generated_files["html"] = html_path
                 logger.info(f"Generated HTML report: {html_path}")
@@ -96,7 +98,7 @@ class ReportManager:
         if "json" in formats:
             json_path = custom_paths.get("json", self.output_dir / "pytest-summary.json")
             try:
-                json_content = self.json_generator.generate(results)
+                json_content = self.json_generator.generate(results, trend_analytics)
                 self._write_report(json_path, json_content)
                 generated_files["json"] = json_path
                 logger.info(f"Generated JSON summary: {json_path}")
