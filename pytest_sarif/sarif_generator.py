@@ -174,6 +174,10 @@ class SARIFGenerator:
                     sarif_result["properties"]["owasp_category"] = owasp_category.id
                     sarif_result["properties"]["owasp_name"] = owasp_category.name
 
+                    # Add remediation suggestions as SARIF fixes
+                    if owasp_category.remediation_steps:
+                        sarif_result["fixes"] = self._generate_fixes(owasp_category)
+
                 # Add CWE information
                 cwe_ids = get_cwe_tags(result.markers)
                 if cwe_ids:
@@ -226,3 +230,25 @@ class SARIFGenerator:
                 return severity_scores[marker]
 
         return "5.0"  # Default medium severity
+
+    def _generate_fixes(self, owasp_category) -> List[Dict[str, Any]]:
+        """Generate SARIF fix objects from remediation steps.
+
+        Args:
+            owasp_category: OWASPCategory with remediation steps
+
+        Returns:
+            List of SARIF fix objects
+        """
+        fixes = []
+
+        for idx, step in enumerate(owasp_category.remediation_steps, 1):
+            fix = {
+                "description": {
+                    "text": f"Remediation step {idx}: {step}"
+                },
+                "artifactChanges": []  # Conceptual fixes, no specific file changes
+            }
+            fixes.append(fix)
+
+        return fixes

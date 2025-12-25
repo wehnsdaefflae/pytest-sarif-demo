@@ -182,6 +182,18 @@ class HTMLReportGenerator:
 
             status_class = "owasp-passed" if cat_stats["failed"] == 0 else "owasp-failed"
 
+            # Build remediation steps HTML if category has failures
+            remediation_html = ""
+            if cat_stats["failed"] > 0 and category.remediation_steps:
+                remediation_items = "".join(
+                    f"<li>{step}</li>" for step in category.remediation_steps[:5]  # Show top 5
+                )
+                remediation_html = f"""
+                <div class="remediation-section">
+                    <h4>Recommended Remediation Steps:</h4>
+                    <ol class="remediation-list">{remediation_items}</ol>
+                </div>"""
+
             owasp_html += f"""
             <div class="owasp-card {status_class}">
                 <div class="owasp-header">
@@ -195,6 +207,7 @@ class HTMLReportGenerator:
                 <div class="owasp-tags">
                     {' '.join(f'<span class="tag">{tag}</span>' for tag in category.tags)}
                 </div>
+                {remediation_html}
             </div>"""
 
         owasp_html += '</div>'
@@ -223,11 +236,23 @@ class HTMLReportGenerator:
             severity = self._get_test_severity(result)
             owasp_markers = get_owasp_markers_from_test(result.markers)
             owasp_info = ""
+            remediation_html = ""
 
             if owasp_markers:
                 category = get_owasp_category(owasp_markers[0])
                 if category:
                     owasp_info = f'<span class="owasp-badge">{category.id}</span>'
+
+                    # Add remediation guidance for failed tests
+                    if category.remediation_steps:
+                        remediation_items = "".join(
+                            f"<li>{step}</li>" for step in category.remediation_steps[:3]  # Show top 3
+                        )
+                        remediation_html = f"""
+                        <div class="test-remediation">
+                            <strong>How to fix ({category.id}):</strong>
+                            <ol>{remediation_items}</ol>
+                        </div>"""
 
             tests_html += f"""
             <div class="test-item failed">
@@ -240,6 +265,7 @@ class HTMLReportGenerator:
                 <div class="test-error">
                     <pre>{self._escape_html(result.longrepr or 'No error details')}</pre>
                 </div>
+                {remediation_html}
             </div>"""
 
         return f"""
@@ -860,6 +886,60 @@ section h2 {
     font-size: 0.85rem;
     color: #856404;
     font-weight: 600;
+}
+
+/* Remediation Styles */
+.remediation-section {
+    margin-top: 15px;
+    padding: 12px;
+    background: #fff9f0;
+    border-left: 3px solid #ffc107;
+    border-radius: 4px;
+}
+
+.remediation-section h4 {
+    font-size: 0.9rem;
+    color: #856404;
+    margin-bottom: 8px;
+}
+
+.remediation-list {
+    margin: 0;
+    padding-left: 20px;
+    font-size: 0.85rem;
+    color: #495057;
+}
+
+.remediation-list li {
+    margin-bottom: 6px;
+    line-height: 1.4;
+}
+
+.test-remediation {
+    margin-top: 12px;
+    padding: 12px;
+    background: #e7f5ff;
+    border-left: 3px solid #17a2b8;
+    border-radius: 4px;
+}
+
+.test-remediation strong {
+    display: block;
+    color: #117a8b;
+    margin-bottom: 8px;
+    font-size: 0.9rem;
+}
+
+.test-remediation ol {
+    margin: 0;
+    padding-left: 20px;
+    font-size: 0.85rem;
+    color: #495057;
+}
+
+.test-remediation li {
+    margin-bottom: 6px;
+    line-height: 1.4;
 }
 
 @media (max-width: 768px) {

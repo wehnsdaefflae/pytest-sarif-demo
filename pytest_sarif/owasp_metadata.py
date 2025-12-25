@@ -16,6 +16,7 @@ class OWASPCategory:
     cwe_ids: List[str]
     references: List[str]
     tags: List[str]
+    remediation_steps: List[str]
 
 
 OWASP_LLM_CATEGORIES: Dict[str, OWASPCategory] = {
@@ -41,6 +42,16 @@ OWASP_LLM_CATEGORIES: Dict[str, OWASPCategory] = {
             "https://llmtop10.com/llm01",
         ],
         tags=["injection", "prompt-manipulation", "jailbreak"],
+        remediation_steps=[
+            "Implement strict input validation and sanitization for all user-provided prompts",
+            "Use prompt templates with clearly defined variable placeholders to separate instructions from data",
+            "Apply privilege control and least-privilege principles to LLM backend system access",
+            "Require human-in-the-loop approval for high-risk or sensitive operations",
+            "Establish trust boundaries between system prompts, user inputs, and external data sources",
+            "Deploy content filtering to detect and block common prompt injection patterns",
+            "Implement comprehensive logging and monitoring to detect anomalous LLM behavior",
+            "Use delimiter tokens or special formatting to clearly separate user content from instructions"
+        ],
     ),
     "owasp_llm02": OWASPCategory(
         id="LLM02",
@@ -66,6 +77,16 @@ OWASP_LLM_CATEGORIES: Dict[str, OWASPCategory] = {
             "https://llmtop10.com/llm02",
         ],
         tags=["data-leakage", "privacy", "confidentiality"],
+        remediation_steps=[
+            "Sanitize and scrub training data to remove PII, credentials, and sensitive information",
+            "Implement output filtering to detect and redact sensitive data patterns in LLM responses",
+            "Apply differential privacy techniques during model training to prevent data memorization",
+            "Use access controls to restrict LLM access to sensitive data sources",
+            "Configure rate limiting to prevent data extraction through repeated queries",
+            "Implement context-aware response filtering based on user permissions and data classification",
+            "Audit model outputs regularly for inadvertent sensitive information disclosure",
+            "Use federated learning approaches to train on sensitive data without centralizing it"
+        ],
     ),
     "owasp_llm03": OWASPCategory(
         id="LLM03",
@@ -91,6 +112,16 @@ OWASP_LLM_CATEGORIES: Dict[str, OWASPCategory] = {
             "https://llmtop10.com/llm03",
         ],
         tags=["supply-chain", "third-party", "dependencies"],
+        remediation_steps=[
+            "Maintain Software Bill of Materials (SBOM) for all LLM components and dependencies",
+            "Verify signatures and checksums of pre-trained models before deployment",
+            "Vet and audit all third-party data sources for integrity and provenance",
+            "Use trusted model repositories with verified publishers only",
+            "Implement continuous vulnerability scanning for dependencies and libraries",
+            "Apply adversarial robustness testing to detect model backdoors and poisoning",
+            "Establish secure model development pipeline with version control and access logs",
+            "Monitor model behavior for anomalies that may indicate supply chain compromise"
+        ],
     ),
     "owasp_llm04": OWASPCategory(
         id="LLM04",
@@ -106,7 +137,7 @@ OWASP_LLM_CATEGORIES: Dict[str, OWASPCategory] = {
         help_text=(
             "To prevent Model DoS: (1) Implement input validation to limit input size and complexity, "
             "(2) Set rate limiting on API requests per user/IP, (3) Implement resource monitoring and "
-            "throttling, (4) Set maximum processing time for queries, (5) Design systems to handle "
+            "(4) Set maximum processing time for queries, (5) Design systems to handle "
             "expected load with graceful degradation, (6) Monitor for unusual resource consumption patterns."
         ),
         cwe_ids=["CWE-400", "CWE-770", "CWE-920"],
@@ -115,6 +146,16 @@ OWASP_LLM_CATEGORIES: Dict[str, OWASPCategory] = {
             "https://llmtop10.com/llm04",
         ],
         tags=["denial-of-service", "resource-exhaustion", "availability"],
+        remediation_steps=[
+            "Enforce strict input size limits (tokens, characters) on all LLM queries",
+            "Implement rate limiting per user, API key, and IP address",
+            "Set maximum processing time timeouts for query execution",
+            "Deploy resource quotas and throttling for API consumers",
+            "Use load balancing and auto-scaling to handle traffic spikes gracefully",
+            "Monitor resource usage patterns and alert on anomalies",
+            "Implement CAPTCHA or proof-of-work for unauthenticated requests",
+            "Queue and prioritize requests to prevent resource starvation"
+        ],
     ),
     "owasp_llm05": OWASPCategory(
         id="LLM05",
@@ -140,6 +181,16 @@ OWASP_LLM_CATEGORIES: Dict[str, OWASPCategory] = {
             "https://llmtop10.com/llm05",
         ],
         tags=["injection", "output-validation", "xss", "sql-injection"],
+        remediation_steps=[
+            "Validate and sanitize all LLM outputs before passing to downstream systems",
+            "Encode LLM output for the target context (HTML, JavaScript, SQL, etc.)",
+            "Use parameterized queries or prepared statements when using LLM output in databases",
+            "Apply strict content security policies (CSP) to prevent XSS from LLM-generated content",
+            "Implement allowlist-based validation for LLM outputs used in critical operations",
+            "Treat LLM outputs as untrusted user input in all security contexts",
+            "Use sandboxing or isolated execution environments for processing LLM outputs",
+            "Deploy web application firewalls (WAF) to detect injection attempts in LLM outputs"
+        ],
     ),
     "owasp_llm06": OWASPCategory(
         id="LLM06",
@@ -165,6 +216,16 @@ OWASP_LLM_CATEGORIES: Dict[str, OWASPCategory] = {
             "https://llmtop10.com/llm06",
         ],
         tags=["plugin", "tool-use", "access-control", "authorization"],
+        remediation_steps=[
+            "Enforce parameterized input and strict type validation for all plugin parameters",
+            "Implement comprehensive authentication and authorization for plugin access",
+            "Apply principle of least privilege to plugin permissions and capabilities",
+            "Require explicit user approval for high-risk plugin actions (file access, code execution)",
+            "Validate and sanitize all plugin inputs and outputs rigorously",
+            "Implement plugin sandboxing to isolate execution environments",
+            "Audit and review third-party plugins for security vulnerabilities",
+            "Monitor and log all plugin invocations for security analysis"
+        ],
     ),
     "owasp_llm07": OWASPCategory(
         id="LLM07",
@@ -192,6 +253,16 @@ OWASP_LLM_CATEGORIES: Dict[str, OWASPCategory] = {
             "https://llmtop10.com/llm07",
         ],
         tags=["information-disclosure", "prompt-leakage", "configuration"],
+        remediation_steps=[
+            "Avoid embedding sensitive data, credentials, or business logic directly in system prompts",
+            "Implement output filtering to detect and prevent system prompt disclosure in responses",
+            "Use prompt isolation techniques to clearly separate system and user content",
+            "Monitor for common extraction patterns like 'repeat your instructions' or 'show system prompt'",
+            "Apply defensive prompt engineering with explicit instructions against disclosure",
+            "Regularly test for prompt extraction vulnerabilities using adversarial techniques",
+            "Implement response screening to detect leaked prompt fragments",
+            "Use dynamic prompt generation to vary non-sensitive instructions across sessions"
+        ],
     ),
     "owasp_llm08": OWASPCategory(
         id="LLM08",
@@ -219,6 +290,16 @@ OWASP_LLM_CATEGORIES: Dict[str, OWASPCategory] = {
             "https://llmtop10.com/llm08",
         ],
         tags=["authorization", "privilege-escalation", "autonomy"],
+        remediation_steps=[
+            "Apply least privilege principle - grant LLM minimum necessary permissions only",
+            "Implement human-in-the-loop approval for destructive or sensitive operations",
+            "Limit the scope and capabilities of available plugins/tools to essential functions only",
+            "Track user authorization separately and validate before LLM-initiated actions",
+            "Set explicit boundaries on action chains and autonomous decision-making depth",
+            "Implement comprehensive audit logging for all LLM-initiated actions",
+            "Require explicit user consent before performing state-changing operations",
+            "Use role-based access control (RBAC) to restrict LLM capabilities per user context"
+        ],
     ),
     "owasp_llm09": OWASPCategory(
         id="LLM09",
@@ -246,6 +327,16 @@ OWASP_LLM_CATEGORIES: Dict[str, OWASPCategory] = {
             "https://llmtop10.com/llm09",
         ],
         tags=["hallucination", "misinformation", "verification"],
+        remediation_steps=[
+            "Implement mandatory human review for critical decisions based on LLM outputs",
+            "Display confidence scores and uncertainty indicators alongside LLM responses",
+            "Provide clear disclaimers about LLM limitations and potential for errors",
+            "Implement cross-verification with authoritative sources for fact-checkable claims",
+            "Include source citations and attribution for LLM-generated information",
+            "Establish validation workflows for high-stakes outputs (legal, medical, financial)",
+            "Train users on recognizing hallucinations and LLM capability boundaries",
+            "Deploy automated fact-checking and consistency validation where applicable"
+        ],
     ),
     "owasp_llm10": OWASPCategory(
         id="LLM10",
@@ -274,6 +365,16 @@ OWASP_LLM_CATEGORIES: Dict[str, OWASPCategory] = {
             "https://llmtop10.com/llm10",
         ],
         tags=["theft", "extraction", "intellectual-property"],
+        remediation_steps=[
+            "Enforce strong authentication and authorization for all model access points",
+            "Encrypt models at rest using industry-standard encryption (AES-256)",
+            "Encrypt model transmissions using TLS 1.3 or equivalent",
+            "Implement rate limiting and query throttling to prevent model extraction via API",
+            "Deploy model watermarking to track unauthorized model distribution",
+            "Monitor for suspicious query patterns that may indicate extraction attempts",
+            "Use model obfuscation techniques when deploying to edge or untrusted environments",
+            "Maintain comprehensive audit logs of all model access and usage"
+        ],
     ),
 }
 

@@ -148,6 +148,17 @@ class MarkdownReportGenerator:
 
             cat_stats = stats["owasp_categories"][category_id]
 
+            # Add remediation steps if there are failures
+            remediation_section = ""
+            if cat_stats['failed'] > 0 and category.remediation_steps:
+                remediation_list = '\n'.join(f"{i}. {step}" for i, step in enumerate(category.remediation_steps, 1))
+                remediation_section = f"""
+
+**Recommended Remediation Steps:**
+
+{remediation_list}
+"""
+
             owasp_section += f"""#### {category.id}: {category.name}
 
 {category.description}
@@ -157,6 +168,7 @@ class MarkdownReportGenerator:
 **Tags:** {', '.join(f'`{tag}`' for tag in category.tags)}
 
 **CWE IDs:** {', '.join(category.cwe_ids)}
+{remediation_section}
 
 ---
 
@@ -186,11 +198,23 @@ Found **{len(failed_results)}** failing test(s):
 
             owasp_markers = get_owasp_markers_from_test(result.markers)
             owasp_info = ""
+            remediation_section = ""
 
             if owasp_markers:
                 category = get_owasp_category(owasp_markers[0])
                 if category:
                     owasp_info = f"\n**OWASP Category:** {category.id} - {category.name}"
+
+                    # Add remediation guidance
+                    if category.remediation_steps:
+                        top_steps = category.remediation_steps[:5]  # Show top 5 steps
+                        remediation_list = '\n'.join(f"{j}. {step}" for j, step in enumerate(top_steps, 1))
+                        remediation_section = f"""
+
+**How to Fix:**
+
+{remediation_list}
+"""
 
             failures_section += f"""### {i}. {result.test_name}
 
@@ -205,6 +229,7 @@ Found **{len(failed_results)}** failing test(s):
 ```
 
 </details>
+{remediation_section}
 
 ---
 
