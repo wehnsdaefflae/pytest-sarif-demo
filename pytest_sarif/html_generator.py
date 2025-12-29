@@ -17,17 +17,23 @@ class HTMLReportGenerator:
         self.tool_name = tool_name
         self.tool_version = tool_version
 
-    def generate(self, results: List[TestResult], trend_analytics: Optional[Dict] = None) -> str:
+    def generate(self, results: List[TestResult], trend_analytics: Optional[Dict] = None, baseline_analysis=None) -> str:
         """Generate HTML report from test results.
 
         Args:
             results: List of test results
             trend_analytics: Optional trend analytics data
+            baseline_analysis: Optional baseline regression analysis
 
         Returns:
             HTML formatted report
         """
         stats = self._calculate_statistics(results)
+
+        # Generate baseline section HTML if analysis available
+        baseline_section = ""
+        if baseline_analysis:
+            baseline_section = self._generate_baseline_section(baseline_analysis)
 
         # Generate trend section HTML if analytics available
         trend_section = ""
@@ -54,6 +60,7 @@ class HTMLReportGenerator:
             </div>
         </header>
 
+        {baseline_section}
         {trend_section}
         {self._generate_summary_section(stats)}
         {self._generate_severity_section(stats)}
@@ -393,6 +400,123 @@ class HTMLReportGenerator:
                 </div>
             </div>
             {flaky_html}
+        </section>"""
+
+    def _generate_baseline_section(self, baseline_analysis) -> str:
+        """Generate baseline comparison section with regression details."""
+        # Determine overall status
+        if baseline_analysis.has_regressions:
+            status_class = "baseline-regression"
+            status_icon = "⚠"
+            status_text = "Regressions Detected"
+        elif baseline_analysis.has_improvements:
+            status_class = "baseline-improvement"
+            status_icon = "✓"
+            status_text = "Improvements Found"
+        else:
+            status_class = "baseline-stable"
+            status_icon = "→"
+            status_text = "No Changes"
+
+        # Severity impact details
+        severity_impact_html = ""
+        if baseline_analysis.severity_impact:
+            severity_items = ""
+            for severity, count in sorted(baseline_analysis.severity_impact.items()):
+                severity_items += f"""
+                <div class="severity-impact-item {severity}">
+                    <span class="severity-badge">{severity.upper()}</span>
+                    <span class="impact-count">{count} regression(s)</span>
+                </div>"""
+            severity_impact_html = f"""
+            <div class="severity-impact">
+                <h4>Regression Severity Impact</h4>
+                {severity_items}
+            </div>"""
+
+        # Regressed tests list
+        regressed_tests_html = ""
+        if baseline_analysis.regressed_tests:
+            test_items = ""
+            for test_id in baseline_analysis.regressed_tests[:10]:  # Show top 10
+                test_name = test_id.split("::")[-1]
+                test_items += f"""
+                <div class="regressed-test-item">
+                    <code>{test_name}</code>
+                </div>"""
+
+            more_count = len(baseline_analysis.regressed_tests) - 10
+            more_html = f"<div class='more-tests'>...and {more_count} more</div>" if more_count > 0 else ""
+
+            regressed_tests_html = f"""
+            <div class="regressed-tests-alert">
+                <h4>Regressed Tests ({len(baseline_analysis.regressed_tests)})</h4>
+                <div class="regressed-list">{test_items}{more_html}</div>
+            </div>"""
+
+        # Fixed tests list
+        fixed_tests_html = ""
+        if baseline_analysis.fixed_tests:
+            test_items = ""
+            for test_id in baseline_analysis.fixed_tests[:5]:  # Show top 5
+                test_name = test_id.split("::")[-1]
+                test_items += f"""
+                <div class="fixed-test-item">
+                    <code>{test_name}</code>
+                </div>"""
+
+            more_count = len(baseline_analysis.fixed_tests) - 5
+            more_html = f"<div class='more-tests'>...and {more_count} more</div>" if more_count > 0 else ""
+
+            fixed_tests_html = f"""
+            <div class="fixed-tests-info">
+                <h4>✓ Fixed Tests ({len(baseline_analysis.fixed_tests)})</h4>
+                <div class="fixed-list">{test_items}{more_html}</div>
+            </div>"""
+
+        return f"""
+        <section class="baseline-comparison {status_class}">
+            <h2>Baseline Comparison</h2>
+            <div class="baseline-grid">
+                <div class="baseline-card {status_class}">
+                    <div class="baseline-icon">{status_icon}</div>
+                    <div class="baseline-content">
+                        <div class="baseline-label">Status</div>
+                        <div class="baseline-value">{status_text}</div>
+                        <div class="baseline-detail">Pass Rate: {baseline_analysis.baseline_pass_rate:.1f}% → {baseline_analysis.current_pass_rate:.1f}% ({baseline_analysis.pass_rate_change:+.1f}%)</div>
+                    </div>
+                </div>
+
+                <div class="baseline-card">
+                    <div class="baseline-stat">{baseline_analysis.regression_count}</div>
+                    <div class="baseline-content">
+                        <div class="baseline-label">Regressions</div>
+                        <div class="baseline-value">{baseline_analysis.regression_severity.upper()}</div>
+                        <div class="baseline-detail">Tests now failing</div>
+                    </div>
+                </div>
+
+                <div class="baseline-card">
+                    <div class="baseline-stat">{baseline_analysis.improvement_count}</div>
+                    <div class="baseline-content">
+                        <div class="baseline-label">Improvements</div>
+                        <div class="baseline-value">Fixed</div>
+                        <div class="baseline-detail">Tests now passing</div>
+                    </div>
+                </div>
+
+                <div class="baseline-card">
+                    <div class="baseline-stat">{len(baseline_analysis.added_tests)}</div>
+                    <div class="baseline-content">
+                        <div class="baseline-label">New Tests</div>
+                        <div class="baseline-value">Added</div>
+                        <div class="baseline-detail">{len(baseline_analysis.removed_tests)} removed</div>
+                    </div>
+                </div>
+            </div>
+            {severity_impact_html}
+            {regressed_tests_html}
+            {fixed_tests_html}
         </section>"""
 
     def _get_test_severity(self, result: TestResult) -> str:

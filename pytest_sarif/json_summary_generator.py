@@ -16,12 +16,13 @@ class JSONSummaryGenerator:
         self.tool_name = tool_name
         self.tool_version = tool_version
 
-    def generate(self, results: List[TestResult], trend_analytics: Optional[Dict] = None) -> str:
+    def generate(self, results: List[TestResult], trend_analytics: Optional[Dict] = None, baseline_analysis=None) -> str:
         """Generate JSON summary from test results.
 
         Args:
             results: List of test results
             trend_analytics: Optional trend analytics data
+            baseline_analysis: Optional baseline regression analysis
 
         Returns:
             JSON formatted summary report
@@ -31,7 +32,7 @@ class JSONSummaryGenerator:
                 "tool": self.tool_name,
                 "version": self.tool_version,
                 "generated_at": datetime.now().isoformat(),
-                "report_format": "json-summary-v1.1"
+                "report_format": "json-summary-v1.2"
             },
             "summary": self._generate_summary(results),
             "severity_distribution": self._generate_severity_distribution(results),
@@ -39,6 +40,10 @@ class JSONSummaryGenerator:
             "test_results": self._generate_test_results(results),
             "failures": self._generate_failures(results)
         }
+
+        # Add baseline comparison if available
+        if baseline_analysis:
+            summary["baseline_comparison"] = baseline_analysis.to_dict()
 
         # Add trend analytics if available
         if trend_analytics and trend_analytics.get("has_history"):

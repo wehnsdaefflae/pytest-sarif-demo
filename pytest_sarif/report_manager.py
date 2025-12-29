@@ -48,7 +48,8 @@ class ReportManager:
         results: List[TestResult],
         formats: List[str] = None,
         custom_paths: dict = None,
-        trend_analytics: Optional[dict] = None
+        trend_analytics: Optional[dict] = None,
+        baseline_analysis: Optional[any] = None
     ) -> dict:
         """Generate reports in specified formats.
 
@@ -57,6 +58,7 @@ class ReportManager:
             formats: List of format names to generate (default: all)
             custom_paths: Optional dict mapping format names to custom file paths
             trend_analytics: Optional trend analytics data to include in reports
+            baseline_analysis: Optional baseline regression analysis to include in reports
 
         Returns:
             Dict mapping format names to generated file paths
@@ -76,7 +78,7 @@ class ReportManager:
         if "sarif" in formats:
             sarif_path = custom_paths.get("sarif", self.output_dir / "pytest-results.sarif")
             try:
-                sarif_content = self.sarif_generator.generate(results)
+                sarif_content = self.sarif_generator.generate(results, baseline_analysis)
                 self._write_report(sarif_path, sarif_content)
                 generated_files["sarif"] = sarif_path
                 logger.info(f"Generated SARIF report: {sarif_path}")
@@ -87,7 +89,7 @@ class ReportManager:
         if "html" in formats:
             html_path = custom_paths.get("html", self.output_dir / "pytest-results.html")
             try:
-                html_content = self.html_generator.generate(results, trend_analytics)
+                html_content = self.html_generator.generate(results, trend_analytics, baseline_analysis)
                 self._write_report(html_path, html_content)
                 generated_files["html"] = html_path
                 logger.info(f"Generated HTML report: {html_path}")
@@ -98,7 +100,7 @@ class ReportManager:
         if "json" in formats:
             json_path = custom_paths.get("json", self.output_dir / "pytest-summary.json")
             try:
-                json_content = self.json_generator.generate(results, trend_analytics)
+                json_content = self.json_generator.generate(results, trend_analytics, baseline_analysis)
                 self._write_report(json_path, json_content)
                 generated_files["json"] = json_path
                 logger.info(f"Generated JSON summary: {json_path}")
@@ -109,7 +111,7 @@ class ReportManager:
         if "markdown" in formats:
             md_path = custom_paths.get("markdown", self.output_dir / "pytest-results.md")
             try:
-                md_content = self.markdown_generator.generate(results)
+                md_content = self.markdown_generator.generate(results, baseline_analysis)
                 self._write_report(md_path, md_content)
                 generated_files["markdown"] = md_path
                 logger.info(f"Generated Markdown report: {md_path}")

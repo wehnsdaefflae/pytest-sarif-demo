@@ -10,6 +10,7 @@ from .models import TestResult
 from .owasp_metadata import get_owasp_category, get_owasp_markers_from_test
 from .report_manager import ReportManager
 from .trend_tracker import TrendTracker
+from .baseline_manager import BaselineManager
 
 
 class SARIFPlugin:
@@ -49,6 +50,13 @@ class SARIFPlugin:
             self.trend_tracker = TrendTracker(trend_file)
         else:
             self.trend_tracker = None
+
+        # Baseline management
+        baseline_file = self.report_dir / "baseline.json"
+        self.baseline_manager = BaselineManager(baseline_file)
+        self.baseline_save = config.getoption("--save-baseline", False)
+        self.baseline_compare = config.getoption("--compare-baseline", False)
+        self.baseline_update = config.getoption("--update-baseline", False)
 
     @pytest.hookimpl(hookwrapper=True)
     def pytest_runtest_makereport(self, item, call):
@@ -104,7 +112,7 @@ class SARIFPlugin:
 
         return stats
 
-    def _print_summary(self, stats: Dict, trend_analytics: Optional[Dict] = None):
+    def _print_summary(self, stats: Dict, trend_analytics: Optional[Dict] = None, baseline_analysis=None):
         """Print comprehensive test summary with OWASP categories and trends."""
         print("\n" + "=" * 70)
         print("OWASP LLM Security Test Summary")
@@ -114,6 +122,26 @@ class SARIFPlugin:
         print(f"\nTotal Tests:  {stats['total_tests']}")
         print(f"Passed:       {stats['passed_tests']}")
         print(f"Failed:       {stats['failed_tests']}")
+
+        # Baseline comparison summary
+        if baseline_analysis:
+            print(f"\nBaseline Comparison:")
+            print(f"  Pass Rate:    {baseline_analysis.baseline_pass_rate:.1f}% → {baseline_analysis.current_pass_rate:.1f}% ({baseline_analysis.pass_rate_change:+.1f}%)")
+
+            if baseline_analysis.has_regressions:
+                print(f"  ⚠ Regressions: {baseline_analysis.regression_count} test(s) now failing")
+                if baseline_analysis.severity_impact:
+                    impacts = [f"{count} {sev}" for sev, count in sorted(baseline_analysis.severity_impact.items())]
+                    print(f"    Impact:     {', '.join(impacts)}")
+
+            if baseline_analysis.has_improvements:
+                print(f"  ✓ Fixed:      {baseline_analysis.improvement_count} test(s) now passing")
+
+            if baseline_analysis.added_tests:
+                print(f"  + New Tests:  {len(baseline_analysis.added_tests)}")
+
+            if baseline_analysis.removed_tests:
+                print(f"  - Removed:    {len(baseline_analysis.removed_tests)}")
 
         # Trend analytics summary
         if trend_analytics and trend_analytics.get("has_history"):
@@ -170,7 +198,20 @@ class SARIFPlugin:
             if self.trend_tracker:
                 trend_analytics = self.trend_tracker.get_trend_analytics(self.results)
 
-            self._print_summary(stats, trend_analytics)
+            # Baseline comparison
+            baseline_analysis = None
+            if self.baseline_compare or self.baseline_update:
+                baseline_analysis = self.baseline_manager.compare_with_baseline(self.results)
+                if baseline_analysis is None:
+                    print("\n⚠ Warning: No baseline found for comparison. Use --save-baseline to create one.")
+
+            self._print_summary(stats, trend_analytics, baseline_analysis)
+
+            # Save or update baseline if requested
+            if self.baseline_save or (self.baseline_update and baseline_analysis):
+                baseline_path = self.baseline_manager.save_baseline(self.results)
+                action = "Updated" if self.baseline_update else "Saved"
+                print(f"\n{action} baseline: {baseline_path}")
 
             # Save test results to history for trend tracking
             if self.trend_tracker:
@@ -189,18 +230,19 @@ class SARIFPlugin:
                 tool_name="pytest-sarif-demo",
                 tool_version="0.1.0",
                 source_root=Path.cwd()
-            ).generate(self.results)
+            ).generate(self.results, baseline_analysis)
 
             self.sarif_output.parent.mkdir(parents=True, exist_ok=True)
             self.sarif_output.write_text(sarif_report, encoding="utf-8")
 
             # Generate additional report formats if specified
             if self.report_formats:
-                # Pass trend analytics to report manager for inclusion in reports
+                # Pass trend analytics and baseline analysis to report manager
                 generated_files = report_manager.generate_reports(
                     results=self.results,
                     formats=self.report_formats,
-                    trend_analytics=trend_analytics
+                    trend_analytics=trend_analytics,
+                    baseline_analysis=baseline_analysis
                 )
 
                 # Print information about generated reports
@@ -310,6 +352,27 @@ def pytest_addoption(parser):
         action="store_false",
         dest="enable_trends",
         help="Disable historical trend tracking"
+    )
+    group.addoption(
+        "--save-baseline",
+        action="store_true",
+        dest="save_baseline",
+        default=False,
+        help="Save current test results as baseline for future comparisons"
+    )
+    group.addoption(
+        "--compare-baseline",
+        action="store_true",
+        dest="compare_baseline",
+        default=False,
+        help="Compare current results with saved baseline and report regressions"
+    )
+    group.addoption(
+        "--update-baseline",
+        action="store_true",
+        dest="update_baseline",
+        default=False,
+        help="Update baseline with current results after comparison"
     )
 
     parser.addini(

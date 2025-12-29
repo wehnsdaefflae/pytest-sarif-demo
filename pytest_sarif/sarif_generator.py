@@ -33,23 +33,31 @@ class SARIFGenerator:
         self.tool_version = tool_version
         self.source_root = source_root
 
-    def generate(self, results: List[TestResult]) -> str:
-        """Generate SARIF JSON from test results."""
+    def generate(self, results: List[TestResult], baseline_analysis=None) -> str:
+        """Generate SARIF JSON from test results.
+
+        Args:
+            results: List of test results
+            baseline_analysis: Optional baseline regression analysis
+
+        Returns:
+            SARIF JSON string
+        """
         sarif = {
             "version": self.SARIF_VERSION,
             "$schema": self.SARIF_SCHEMA,
-            "runs": [self._create_run(results)]
+            "runs": [self._create_run(results, baseline_analysis)]
         }
 
         return json.dumps(sarif, indent=2, ensure_ascii=False)
 
-    def _create_run(self, results: List[TestResult]) -> Dict[str, Any]:
+    def _create_run(self, results: List[TestResult], baseline_analysis=None) -> Dict[str, Any]:
         """Create SARIF run object."""
         rules = self._generate_rules(results)
-        sarif_results = self._generate_results(results)
+        sarif_results = self._generate_results(results, baseline_analysis)
         artifacts = self._generate_artifacts(results)
 
-        return {
+        run = {
             "tool": {
                 "driver": {
                     "name": self.tool_name,
@@ -68,6 +76,27 @@ class SARIFGenerator:
                 }
             ]
         }
+
+        # Add baseline comparison properties if available
+        if baseline_analysis:
+            run["properties"] = {
+                "baseline_comparison": {
+                    "has_regressions": baseline_analysis.has_regressions,
+                    "has_improvements": baseline_analysis.has_improvements,
+                    "regression_count": baseline_analysis.regression_count,
+                    "improvement_count": baseline_analysis.improvement_count,
+                    "regressed_tests": baseline_analysis.regressed_tests,
+                    "fixed_tests": baseline_analysis.fixed_tests,
+                    "baseline_pass_rate": baseline_analysis.baseline_pass_rate,
+                    "current_pass_rate": baseline_analysis.current_pass_rate,
+                    "pass_rate_change": baseline_analysis.pass_rate_change,
+                    "severity_impact": baseline_analysis.severity_impact,
+                    "owasp_impact": baseline_analysis.owasp_impact,
+                    "regression_severity": baseline_analysis.regression_severity
+                }
+            }
+
+        return run
 
     def _generate_rules(self, results: List[TestResult]) -> List[Dict[str, Any]]:
         """Generate SARIF rule definitions with OWASP metadata."""
@@ -128,9 +157,12 @@ class SARIFGenerator:
 
         return list(rules.values())
 
-    def _generate_results(self, results: List[TestResult]) -> List[Dict[str, Any]]:
+    def _generate_results(self, results: List[TestResult], baseline_analysis=None) -> List[Dict[str, Any]]:
         """Generate SARIF result objects for failed tests."""
         sarif_results = []
+
+        # Create set of regressed test IDs for quick lookup
+        regressed_test_ids = set(baseline_analysis.regressed_tests) if baseline_analysis else set()
 
         for result in results:
             if result.outcome == "failed":
@@ -141,7 +173,12 @@ class SARIFGenerator:
                 )
 
                 message_text = result.longrepr or "Test failed"
-                if owasp_category:
+
+                # Mark regressions prominently
+                is_regression = result.nodeid in regressed_test_ids
+                if is_regression:
+                    message_text = f"⚠ REGRESSION: {message_text}"
+                elif owasp_category:
                     message_text = f"[{owasp_category.id}] {message_text}"
 
                 sarif_result = {
@@ -168,6 +205,11 @@ class SARIFGenerator:
                         "test_markers": result.markers,
                     },
                 }
+
+                # Mark as baseline regression
+                if is_regression:
+                    sarif_result["properties"]["baseline_regression"] = True
+                    sarif_result["baselineState"] = "new"  # SARIF standard property for new issues
 
                 # Add OWASP category to properties
                 if owasp_category:

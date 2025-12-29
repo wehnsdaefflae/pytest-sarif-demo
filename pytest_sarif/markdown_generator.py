@@ -15,9 +15,22 @@ class MarkdownReportGenerator:
         self.tool_name = tool_name
         self.tool_version = tool_version
 
-    def generate(self, results: List[TestResult]) -> str:
-        """Generate Markdown report from test results."""
+    def generate(self, results: List[TestResult], baseline_analysis=None) -> str:
+        """Generate Markdown report from test results.
+
+        Args:
+            results: List of test results
+            baseline_analysis: Optional baseline regression analysis
+
+        Returns:
+            Markdown formatted report
+        """
         stats = self._calculate_statistics(results)
+
+        # Generate baseline section if available
+        baseline_section = ""
+        if baseline_analysis:
+            baseline_section = self._generate_baseline_section(baseline_analysis)
 
         report = f"""# Security Test Report
 
@@ -25,6 +38,8 @@ class MarkdownReportGenerator:
 **Generated:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 
 ---
+
+{baseline_section}
 
 {self._generate_summary_section(stats)}
 
@@ -254,3 +269,53 @@ Found **{len(failed_results)}** failing test(s):
             "info": "lightgrey"
         }
         return colors.get(severity, "lightgrey")
+
+    def _generate_baseline_section(self, baseline_analysis) -> str:
+        """Generate baseline comparison section."""
+        status_icon = "⚠" if baseline_analysis.has_regressions else ("✓" if baseline_analysis.has_improvements else "→")
+
+        section = f"""## Baseline Comparison {status_icon}
+
+**Pass Rate:** {baseline_analysis.baseline_pass_rate:.1f}% → {baseline_analysis.current_pass_rate:.1f}% ({baseline_analysis.pass_rate_change:+.1f}%)
+
+| Metric | Count |
+|--------|-------|
+| Regressions | {baseline_analysis.regression_count} |
+| Improvements | {baseline_analysis.improvement_count} |
+| New Tests | {len(baseline_analysis.added_tests)} |
+| Removed Tests | {len(baseline_analysis.removed_tests)} |
+"""
+
+        # Add regression details
+        if baseline_analysis.has_regressions:
+            section += f"\n### ⚠ Regressions Detected ({baseline_analysis.regression_count})\n\n"
+
+            # Severity impact table
+            if baseline_analysis.severity_impact:
+                section += "**Severity Impact:**\n\n"
+                section += "| Severity | Count |\n|----------|-------|\n"
+                for severity, count in sorted(baseline_analysis.severity_impact.items()):
+                    section += f"| {severity.upper()} | {count} |\n"
+                section += "\n"
+
+            # List regressed tests
+            section += "**Regressed Tests:**\n\n"
+            for test_id in baseline_analysis.regressed_tests[:10]:
+                test_name = test_id.split("::")[-1]
+                section += f"- `{test_name}`\n"
+
+            if len(baseline_analysis.regressed_tests) > 10:
+                section += f"\n*...and {len(baseline_analysis.regressed_tests) - 10} more*\n"
+
+        # Add improvement details
+        if baseline_analysis.has_improvements:
+            section += f"\n### ✓ Improvements ({baseline_analysis.improvement_count})\n\n"
+            for test_id in baseline_analysis.fixed_tests[:5]:
+                test_name = test_id.split("::")[-1]
+                section += f"- `{test_name}`\n"
+
+            if len(baseline_analysis.fixed_tests) > 5:
+                section += f"\n*...and {len(baseline_analysis.fixed_tests) - 5} more*\n"
+
+        section += "\n---\n"
+        return section
