@@ -185,11 +185,11 @@ class RiskScoringEngine:
         self, results: List, statistics: Dict
     ) -> Dict[str, float]:
         """Calculate risk score for each OWASP category."""
-        from pytest_sarif.owasp_metadata import extract_owasp_markers
+        from pytest_sarif.owasp_metadata import get_owasp_markers_from_test
 
         category_data = {}
         for result in results:
-            markers = extract_owasp_markers(result.markers)
+            markers = get_owasp_markers_from_test(result.markers)
             for marker in markers:
                 if marker not in category_data:
                     category_data[marker] = {"total": 0, "failed": 0}

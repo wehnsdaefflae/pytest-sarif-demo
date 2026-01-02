@@ -146,12 +146,12 @@ class PolicyValidator:
 
     def _check_category_policies(self, results: List, statistics: Dict):
         """Check category-specific policies."""
-        from pytest_sarif.owasp_metadata import extract_owasp_markers
+        from pytest_sarif.owasp_metadata import get_owasp_markers_from_test
 
         category_failures = {}
         for result in results:
             if result.outcome == "failed":
-                markers = extract_owasp_markers(result.markers)
+                markers = get_owasp_markers_from_test(result.markers)
                 for marker in markers:
                     category_failures[marker] = category_failures.get(marker, 0) + 1
 
