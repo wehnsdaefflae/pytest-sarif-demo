@@ -17,13 +17,24 @@ class HTMLReportGenerator:
         self.tool_name = tool_name
         self.tool_version = tool_version
 
-    def generate(self, results: List[TestResult], trend_analytics: Optional[Dict] = None, baseline_analysis=None) -> str:
+    def generate(
+        self,
+        results: List[TestResult],
+        trend_analytics: Optional[Dict] = None,
+        baseline_analysis=None,
+        risk_score=None,
+        policy_violations=None,
+        security_policy=None
+    ) -> str:
         """Generate HTML report from test results.
 
         Args:
             results: List of test results
             trend_analytics: Optional trend analytics data
             baseline_analysis: Optional baseline regression analysis
+            risk_score: Optional risk score assessment
+            policy_violations: Optional list of policy violations
+            security_policy: Optional security policy configuration
 
         Returns:
             HTML formatted report
@@ -39,6 +50,16 @@ class HTMLReportGenerator:
         trend_section = ""
         if trend_analytics and trend_analytics.get("has_history"):
             trend_section = self._generate_trend_section(trend_analytics)
+
+        # Generate risk score section
+        risk_section = ""
+        if risk_score:
+            risk_section = self._generate_risk_section(risk_score)
+
+        # Generate policy compliance section
+        policy_section = ""
+        if security_policy and policy_violations is not None:
+            policy_section = self._generate_policy_section(security_policy, policy_violations)
 
         html = f"""<!DOCTYPE html>
 <html lang="en">
@@ -62,6 +83,8 @@ class HTMLReportGenerator:
 
         {baseline_section}
         {trend_section}
+        {risk_section}
+        {policy_section}
         {self._generate_summary_section(stats)}
         {self._generate_severity_section(stats)}
         {self._generate_owasp_section(stats, results)}
@@ -517,6 +540,184 @@ class HTMLReportGenerator:
             {severity_impact_html}
             {regressed_tests_html}
             {fixed_tests_html}
+        </section>"""
+
+    def _generate_risk_section(self, risk_score) -> str:
+        """Generate risk assessment section."""
+        # Determine risk level styling
+        risk_level_class = risk_score.risk_level
+        risk_level_icons = {
+            "critical": "🔴",
+            "high": "🟠",
+            "medium": "🟡",
+            "low": "🟢",
+            "minimal": "✅"
+        }
+        risk_icon = risk_level_icons.get(risk_score.risk_level, "⚪")
+
+        # Generate top factors HTML
+        top_factors = sorted(risk_score.factors.items(), key=lambda x: x[1], reverse=True)[:5]
+        factors_html = ""
+        for factor, value in top_factors:
+            if value > 5:  # Only show significant factors
+                factor_name = factor.replace('_', ' ').title()
+                bar_width = min(100, value)
+                factors_html += f"""
+                <div class="risk-factor">
+                    <div class="factor-name">{factor_name}</div>
+                    <div class="factor-bar-container">
+                        <div class="factor-bar" style="width: {bar_width}%"></div>
+                    </div>
+                    <div class="factor-value">{value:.1f}</div>
+                </div>"""
+
+        # Generate recommendations HTML
+        recommendations_html = ""
+        for rec in risk_score.recommendations[:5]:  # Top 5 recommendations
+            recommendations_html += f"""
+            <div class="recommendation-item">
+                <span class="rec-bullet">•</span>
+                <span class="rec-text">{self._escape_html(rec)}</span>
+            </div>"""
+
+        # Generate category risks HTML
+        high_risk_cats = [(cat, score) for cat, score in risk_score.category_scores.items() if score > 50]
+        high_risk_cats.sort(key=lambda x: x[1], reverse=True)
+
+        category_risks_html = ""
+        if high_risk_cats:
+            for cat, score in high_risk_cats[:5]:
+                category_risks_html += f"""
+                <div class="category-risk-item">
+                    <span class="category-name">{cat.upper()}</span>
+                    <span class="category-risk-score">{score:.1f}</span>
+                </div>"""
+
+        return f"""
+        <section class="risk-assessment risk-{risk_level_class}">
+            <h2>Risk Assessment</h2>
+            <div class="risk-grid">
+                <div class="risk-card risk-overall">
+                    <div class="risk-icon">{risk_icon}</div>
+                    <div class="risk-content">
+                        <div class="risk-label">Overall Risk</div>
+                        <div class="risk-value">{risk_score.risk_level.upper()}</div>
+                        <div class="risk-score">{risk_score.overall_score:.1f}/100</div>
+                        <div class="risk-detail">Confidence: {risk_score.confidence * 100:.0f}%</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="risk-factors-section">
+                <h3>Risk Factors</h3>
+                <div class="risk-factors-grid">
+                    {factors_html}
+                </div>
+            </div>
+
+            {f'''<div class="high-risk-categories">
+                <h3>High-Risk Categories</h3>
+                <div class="category-risks-grid">
+                    {category_risks_html}
+                </div>
+            </div>''' if high_risk_cats else ''}
+
+            <div class="recommendations-section">
+                <h3>Recommendations</h3>
+                <div class="recommendations-list">
+                    {recommendations_html}
+                </div>
+            </div>
+        </section>"""
+
+    def _generate_policy_section(self, security_policy, policy_violations) -> str:
+        """Generate security policy compliance section."""
+        # Determine overall compliance status
+        is_compliant = len(policy_violations) == 0
+        status_class = "policy-compliant" if is_compliant else "policy-violations"
+        status_icon = "✅" if is_compliant else "⚠"
+        status_text = "COMPLIANT" if is_compliant else "VIOLATIONS DETECTED"
+
+        # Policy info
+        frameworks_html = ""
+        if security_policy.compliance_frameworks:
+            frameworks = ", ".join(security_policy.compliance_frameworks)
+            frameworks_html = f"""
+            <div class="policy-detail">
+                <strong>Compliance Frameworks:</strong> {frameworks}
+            </div>"""
+
+        # Violations breakdown
+        violations_html = ""
+        if policy_violations:
+            critical_count = sum(1 for v in policy_violations if v.severity == "critical")
+            high_count = sum(1 for v in policy_violations if v.severity == "high")
+            medium_count = sum(1 for v in policy_violations if v.severity == "medium")
+
+            violations_html = f"""
+            <div class="violations-breakdown">
+                <h3>Policy Violations Breakdown</h3>
+                <div class="violations-grid">
+                    <div class="violation-card critical">
+                        <div class="violation-count">{critical_count}</div>
+                        <div class="violation-label">Critical</div>
+                    </div>
+                    <div class="violation-card high">
+                        <div class="violation-count">{high_count}</div>
+                        <div class="violation-label">High</div>
+                    </div>
+                    <div class="violation-card medium">
+                        <div class="violation-count">{medium_count}</div>
+                        <div class="violation-label">Medium</div>
+                    </div>
+                </div>
+            </div>"""
+
+            # List critical violations
+            critical_violations = [v for v in policy_violations if v.severity == "critical"]
+            if critical_violations:
+                violations_list = ""
+                for v in critical_violations[:5]:  # Show top 5
+                    violations_list += f"""
+                    <div class="violation-item critical">
+                        <div class="violation-message">{self._escape_html(v.message)}</div>
+                        <div class="violation-details">
+                            Current: {v.current_value} | Threshold: {v.threshold}
+                        </div>
+                        <div class="violation-recommendation">{self._escape_html(v.recommendation)}</div>
+                    </div>"""
+
+                violations_html += f"""
+                <div class="critical-violations-list">
+                    <h3>Critical Violations</h3>
+                    {violations_list}
+                </div>"""
+
+        return f"""
+        <section class="policy-compliance {status_class}">
+            <h2>Security Policy Compliance</h2>
+            <div class="policy-grid">
+                <div class="policy-card {status_class}">
+                    <div class="policy-icon">{status_icon}</div>
+                    <div class="policy-content">
+                        <div class="policy-label">Policy Status</div>
+                        <div class="policy-value">{status_text}</div>
+                        <div class="policy-detail">
+                            Policy: {security_policy.name} (v{security_policy.version})
+                        </div>
+                        {frameworks_html}
+                    </div>
+                </div>
+
+                <div class="policy-card">
+                    <div class="policy-stat">{len(policy_violations)}</div>
+                    <div class="policy-content">
+                        <div class="policy-label">Total Violations</div>
+                        <div class="policy-detail">{security_policy.description}</div>
+                    </div>
+                </div>
+            </div>
+            {violations_html}
         </section>"""
 
     def _get_test_severity(self, result: TestResult) -> str:

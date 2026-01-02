@@ -11,6 +11,8 @@ from .owasp_metadata import get_owasp_category, get_owasp_markers_from_test
 from .report_manager import ReportManager
 from .trend_tracker import TrendTracker
 from .baseline_manager import BaselineManager
+from .policy_config import PolicyLoader, PolicyValidator
+from .risk_scorer import RiskScoringEngine
 
 
 class SARIFPlugin:
@@ -58,6 +60,17 @@ class SARIFPlugin:
         self.baseline_compare = config.getoption("--compare-baseline", False)
         self.baseline_update = config.getoption("--update-baseline", False)
 
+        # Security policy management
+        policy_file = config.getoption("--security-policy", None)
+        if policy_file:
+            self.security_policy = PolicyLoader.load_from_file(Path(policy_file))
+        else:
+            # Load default balanced policy
+            self.security_policy = PolicyLoader.load_default()
+
+        self.enable_policy = config.getoption("--enable-policy", False)
+        self.risk_scorer = RiskScoringEngine()
+
     @pytest.hookimpl(hookwrapper=True)
     def pytest_runtest_makereport(self, item, call):
         """Capture test results."""
@@ -85,11 +98,15 @@ class SARIFPlugin:
     def _generate_statistics(self) -> Dict:
         """Generate statistics about OWASP category coverage."""
         stats = {
+            "total": len(self.results),
+            "failed": sum(1 for r in self.results if r.outcome == "failed"),
+            "passed": sum(1 for r in self.results if r.outcome == "passed"),
             "total_tests": len(self.results),
             "failed_tests": sum(1 for r in self.results if r.outcome == "failed"),
             "passed_tests": sum(1 for r in self.results if r.outcome == "passed"),
             "owasp_categories": defaultdict(lambda: {"total": 0, "failed": 0, "passed": 0}),
             "severity_distribution": defaultdict(int),
+            "by_severity": defaultdict(lambda: {"total": 0, "failed": 0, "passed": 0}),
         }
 
         for result in self.results:
@@ -108,11 +125,23 @@ class SARIFPlugin:
             for marker in ["critical", "high", "medium", "low", "info"]:
                 if marker in result.markers:
                     stats["severity_distribution"][marker] += 1
+                    stats["by_severity"][marker]["total"] += 1
+                    if result.outcome == "failed":
+                        stats["by_severity"][marker]["failed"] += 1
+                    elif result.outcome == "passed":
+                        stats["by_severity"][marker]["passed"] += 1
                     break
 
         return stats
 
-    def _print_summary(self, stats: Dict, trend_analytics: Optional[Dict] = None, baseline_analysis=None):
+    def _print_summary(
+        self,
+        stats: Dict,
+        trend_analytics: Optional[Dict] = None,
+        baseline_analysis=None,
+        risk_score=None,
+        policy_violations=None
+    ):
         """Print comprehensive test summary with OWASP categories and trends."""
         print("\n" + "=" * 70)
         print("OWASP LLM Security Test Summary")
@@ -158,6 +187,49 @@ class SARIFPlugin:
             flakiness = trend_analytics.get("flakiness", {})
             if flakiness.get("count", 0) > 0:
                 print(f"  ⚠ Flaky:      {flakiness['count']} test(s) detected")
+
+        # Risk scoring summary
+        if risk_score:
+            print(f"\nRisk Assessment:")
+            print(f"  Overall Risk: {risk_score.risk_level.upper()} ({risk_score.overall_score:.1f}/100)")
+            print(f"  Confidence:   {risk_score.confidence * 100:.0f}%")
+
+            # Show top risk factors
+            top_factors = sorted(
+                risk_score.factors.items(),
+                key=lambda x: x[1],
+                reverse=True
+            )[:3]
+
+            if top_factors:
+                print(f"  Top Factors:")
+                for factor, value in top_factors:
+                    if value > 10:  # Only show significant factors
+                        factor_name = factor.replace('_', ' ').title()
+                        print(f"    - {factor_name}: {value:.1f}/100")
+
+            # Show top recommendations
+            if risk_score.recommendations:
+                print(f"\n  Recommendations:")
+                for rec in risk_score.recommendations[:2]:  # Top 2 recommendations
+                    print(f"    • {rec}")
+
+        # Policy compliance summary
+        if policy_violations is not None:
+            if len(policy_violations) > 0:
+                print(f"\n⚠ Security Policy Violations: {len(policy_violations)}")
+                print(f"  Critical:     {sum(1 for v in policy_violations if v.severity == 'critical')}")
+                print(f"  High:         {sum(1 for v in policy_violations if v.severity == 'high')}")
+                print(f"  Medium:       {sum(1 for v in policy_violations if v.severity == 'medium')}")
+
+                # Show critical violations
+                critical_violations = [v for v in policy_violations if v.severity == "critical"]
+                if critical_violations:
+                    print(f"\n  Critical Violations:")
+                    for v in critical_violations[:3]:  # Show top 3
+                        print(f"    • {v.message}: {v.current_value} > {v.threshold}")
+            else:
+                print(f"\n✓ Security Policy: COMPLIANT")
 
         # Severity distribution
         if stats["severity_distribution"]:
@@ -205,7 +277,27 @@ class SARIFPlugin:
                 if baseline_analysis is None:
                     print("\n⚠ Warning: No baseline found for comparison. Use --save-baseline to create one.")
 
-            self._print_summary(stats, trend_analytics, baseline_analysis)
+            # Calculate risk score
+            risk_score = self.risk_scorer.calculate_risk(
+                results=self.results,
+                statistics=stats,
+                trend_data=trend_analytics,
+                baseline_analysis=baseline_analysis.__dict__ if baseline_analysis else None,
+            )
+            stats["risk_score"] = risk_score.overall_score
+
+            # Validate against security policy
+            policy_violations = None
+            if self.enable_policy:
+                validator = PolicyValidator(self.security_policy)
+                policy_compliant = validator.validate(self.results, stats)
+                policy_violations = validator.violations
+
+                # Add policy info to stats
+                stats["policy_compliant"] = policy_compliant
+                stats["policy_violations"] = len(policy_violations)
+
+            self._print_summary(stats, trend_analytics, baseline_analysis, risk_score, policy_violations)
 
             # Save or update baseline if requested
             if self.baseline_save or (self.baseline_update and baseline_analysis):
@@ -242,7 +334,10 @@ class SARIFPlugin:
                     results=self.results,
                     formats=self.report_formats,
                     trend_analytics=trend_analytics,
-                    baseline_analysis=baseline_analysis
+                    baseline_analysis=baseline_analysis,
+                    risk_score=risk_score,
+                    policy_violations=policy_violations,
+                    security_policy=self.security_policy if self.enable_policy else None,
                 )
 
                 # Print information about generated reports
@@ -252,6 +347,14 @@ class SARIFPlugin:
                 for format_name, file_path in generated_files.items():
                     print(f"  {format_name.upper():12s} {file_path}")
                 print("=" * 70)
+
+            # Exit with error if policy violations and enforcement is enabled
+            if self.enable_policy and policy_violations:
+                if self.security_policy.fail_on_policy_violation and not self.security_policy.warning_only:
+                    print("\n" + "=" * 70)
+                    print("❌ BUILD FAILED: Security policy violations detected")
+                    print("=" * 70)
+                    session.exitstatus = 1
 
 
 @pytest.hookimpl(tryfirst=True)
@@ -373,6 +476,20 @@ def pytest_addoption(parser):
         dest="update_baseline",
         default=False,
         help="Update baseline with current results after comparison"
+    )
+    group.addoption(
+        "--security-policy",
+        action="store",
+        dest="security_policy",
+        default=None,
+        help="Path to security policy JSON file (e.g., policies/healthcare-hipaa.json)"
+    )
+    group.addoption(
+        "--enable-policy",
+        action="store_true",
+        dest="enable_policy",
+        default=False,
+        help="Enable security policy validation and enforcement"
     )
 
     parser.addini(

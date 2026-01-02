@@ -49,7 +49,10 @@ class ReportManager:
         formats: List[str] = None,
         custom_paths: dict = None,
         trend_analytics: Optional[dict] = None,
-        baseline_analysis: Optional[any] = None
+        baseline_analysis: Optional[any] = None,
+        risk_score: Optional[any] = None,
+        policy_violations: Optional[List] = None,
+        security_policy: Optional[any] = None
     ) -> dict:
         """Generate reports in specified formats.
 
@@ -59,6 +62,9 @@ class ReportManager:
             custom_paths: Optional dict mapping format names to custom file paths
             trend_analytics: Optional trend analytics data to include in reports
             baseline_analysis: Optional baseline regression analysis to include in reports
+            risk_score: Optional risk score assessment
+            policy_violations: Optional list of policy violations
+            security_policy: Optional security policy configuration
 
         Returns:
             Dict mapping format names to generated file paths
@@ -89,7 +95,10 @@ class ReportManager:
         if "html" in formats:
             html_path = custom_paths.get("html", self.output_dir / "pytest-results.html")
             try:
-                html_content = self.html_generator.generate(results, trend_analytics, baseline_analysis)
+                html_content = self.html_generator.generate(
+                    results, trend_analytics, baseline_analysis,
+                    risk_score, policy_violations, security_policy
+                )
                 self._write_report(html_path, html_content)
                 generated_files["html"] = html_path
                 logger.info(f"Generated HTML report: {html_path}")
@@ -100,7 +109,10 @@ class ReportManager:
         if "json" in formats:
             json_path = custom_paths.get("json", self.output_dir / "pytest-summary.json")
             try:
-                json_content = self.json_generator.generate(results, trend_analytics, baseline_analysis)
+                json_content = self.json_generator.generate(
+                    results, trend_analytics, baseline_analysis,
+                    risk_score, policy_violations, security_policy
+                )
                 self._write_report(json_path, json_content)
                 generated_files["json"] = json_path
                 logger.info(f"Generated JSON summary: {json_path}")

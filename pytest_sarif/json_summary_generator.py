@@ -16,13 +16,24 @@ class JSONSummaryGenerator:
         self.tool_name = tool_name
         self.tool_version = tool_version
 
-    def generate(self, results: List[TestResult], trend_analytics: Optional[Dict] = None, baseline_analysis=None) -> str:
+    def generate(
+        self,
+        results: List[TestResult],
+        trend_analytics: Optional[Dict] = None,
+        baseline_analysis=None,
+        risk_score=None,
+        policy_violations=None,
+        security_policy=None
+    ) -> str:
         """Generate JSON summary from test results.
 
         Args:
             results: List of test results
             trend_analytics: Optional trend analytics data
             baseline_analysis: Optional baseline regression analysis
+            risk_score: Optional risk score assessment
+            policy_violations: Optional list of policy violations
+            security_policy: Optional security policy configuration
 
         Returns:
             JSON formatted summary report
@@ -32,7 +43,7 @@ class JSONSummaryGenerator:
                 "tool": self.tool_name,
                 "version": self.tool_version,
                 "generated_at": datetime.now().isoformat(),
-                "report_format": "json-summary-v1.2"
+                "report_format": "json-summary-v2.0"
             },
             "summary": self._generate_summary(results),
             "severity_distribution": self._generate_severity_distribution(results),
@@ -48,6 +59,47 @@ class JSONSummaryGenerator:
         # Add trend analytics if available
         if trend_analytics and trend_analytics.get("has_history"):
             summary["trend_analytics"] = trend_analytics
+
+        # Add risk assessment if available
+        if risk_score:
+            summary["risk_assessment"] = {
+                "overall_score": risk_score.overall_score,
+                "risk_level": risk_score.risk_level,
+                "confidence": risk_score.confidence,
+                "category_scores": risk_score.category_scores,
+                "severity_scores": risk_score.severity_scores,
+                "trend_score": risk_score.trend_score,
+                "baseline_score": risk_score.baseline_score,
+                "factors": risk_score.factors,
+                "recommendations": risk_score.recommendations
+            }
+
+        # Add policy compliance if available
+        if security_policy and policy_violations is not None:
+            summary["policy_compliance"] = {
+                "policy_name": security_policy.name,
+                "policy_version": security_policy.version,
+                "description": security_policy.description,
+                "is_compliant": len(policy_violations) == 0,
+                "total_violations": len(policy_violations),
+                "compliance_frameworks": security_policy.compliance_frameworks,
+                "violations": [
+                    {
+                        "severity": v.severity,
+                        "category": v.category,
+                        "message": v.message,
+                        "current_value": str(v.current_value),
+                        "threshold": str(v.threshold),
+                        "recommendation": v.recommendation
+                    }
+                    for v in policy_violations
+                ],
+                "violations_by_severity": {
+                    "critical": sum(1 for v in policy_violations if v.severity == "critical"),
+                    "high": sum(1 for v in policy_violations if v.severity == "high"),
+                    "medium": sum(1 for v in policy_violations if v.severity == "medium"),
+                }
+            }
 
         return json.dumps(summary, indent=2, ensure_ascii=False)
 
