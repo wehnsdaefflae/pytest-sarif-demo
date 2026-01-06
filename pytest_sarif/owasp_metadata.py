@@ -17,6 +17,7 @@ class OWASPCategory:
     references: List[str]
     tags: List[str]
     remediation_steps: List[str]
+    compliance_frameworks: List[str]  # List of frameworks this category maps to
 
 
 OWASP_LLM_CATEGORIES: Dict[str, OWASPCategory] = {
@@ -52,6 +53,7 @@ OWASP_LLM_CATEGORIES: Dict[str, OWASPCategory] = {
             "Implement comprehensive logging and monitoring to detect anomalous LLM behavior",
             "Use delimiter tokens or special formatting to clearly separate user content from instructions"
         ],
+        compliance_frameworks=["NIST AI RMF", "ISO/IEC 42001", "EU AI Act", "NIST CSF 2.0", "SOC 2", "ISO/IEC 27001"],
     ),
     "owasp_llm02": OWASPCategory(
         id="LLM02",
@@ -87,6 +89,7 @@ OWASP_LLM_CATEGORIES: Dict[str, OWASPCategory] = {
             "Audit model outputs regularly for inadvertent sensitive information disclosure",
             "Use federated learning approaches to train on sensitive data without centralizing it"
         ],
+        compliance_frameworks=["NIST AI RMF", "ISO/IEC 42001", "EU AI Act", "NIST CSF 2.0", "SOC 2", "ISO/IEC 27001"],
     ),
     "owasp_llm03": OWASPCategory(
         id="LLM03",
@@ -122,6 +125,7 @@ OWASP_LLM_CATEGORIES: Dict[str, OWASPCategory] = {
             "Establish secure model development pipeline with version control and access logs",
             "Monitor model behavior for anomalies that may indicate supply chain compromise"
         ],
+        compliance_frameworks=["NIST AI RMF", "ISO/IEC 42001", "EU AI Act", "NIST CSF 2.0", "SOC 2", "ISO/IEC 27001"],
     ),
     "owasp_llm04": OWASPCategory(
         id="LLM04",
@@ -156,6 +160,7 @@ OWASP_LLM_CATEGORIES: Dict[str, OWASPCategory] = {
             "Implement CAPTCHA or proof-of-work for unauthenticated requests",
             "Queue and prioritize requests to prevent resource starvation"
         ],
+        compliance_frameworks=["NIST AI RMF", "ISO/IEC 42001", "NIST CSF 2.0", "SOC 2", "ISO/IEC 27001"],
     ),
     "owasp_llm05": OWASPCategory(
         id="LLM05",
@@ -191,6 +196,7 @@ OWASP_LLM_CATEGORIES: Dict[str, OWASPCategory] = {
             "Use sandboxing or isolated execution environments for processing LLM outputs",
             "Deploy web application firewalls (WAF) to detect injection attempts in LLM outputs"
         ],
+        compliance_frameworks=["NIST AI RMF", "ISO/IEC 42001", "EU AI Act", "NIST CSF 2.0", "SOC 2", "ISO/IEC 27001"],
     ),
     "owasp_llm06": OWASPCategory(
         id="LLM06",
@@ -226,6 +232,7 @@ OWASP_LLM_CATEGORIES: Dict[str, OWASPCategory] = {
             "Audit and review third-party plugins for security vulnerabilities",
             "Monitor and log all plugin invocations for security analysis"
         ],
+        compliance_frameworks=["NIST AI RMF", "ISO/IEC 42001", "NIST CSF 2.0", "SOC 2", "ISO/IEC 27001"],
     ),
     "owasp_llm07": OWASPCategory(
         id="LLM07",
@@ -263,6 +270,7 @@ OWASP_LLM_CATEGORIES: Dict[str, OWASPCategory] = {
             "Implement response screening to detect leaked prompt fragments",
             "Use dynamic prompt generation to vary non-sensitive instructions across sessions"
         ],
+        compliance_frameworks=["NIST AI RMF", "ISO/IEC 42001", "NIST CSF 2.0", "SOC 2", "ISO/IEC 27001"],
     ),
     "owasp_llm08": OWASPCategory(
         id="LLM08",
@@ -300,6 +308,7 @@ OWASP_LLM_CATEGORIES: Dict[str, OWASPCategory] = {
             "Require explicit user consent before performing state-changing operations",
             "Use role-based access control (RBAC) to restrict LLM capabilities per user context"
         ],
+        compliance_frameworks=["NIST AI RMF", "ISO/IEC 42001", "EU AI Act", "NIST CSF 2.0", "SOC 2", "ISO/IEC 27001"],
     ),
     "owasp_llm09": OWASPCategory(
         id="LLM09",
@@ -337,6 +346,7 @@ OWASP_LLM_CATEGORIES: Dict[str, OWASPCategory] = {
             "Train users on recognizing hallucinations and LLM capability boundaries",
             "Deploy automated fact-checking and consistency validation where applicable"
         ],
+        compliance_frameworks=["NIST AI RMF", "ISO/IEC 42001", "EU AI Act", "SOC 2", "ISO/IEC 27001"],
     ),
     "owasp_llm10": OWASPCategory(
         id="LLM10",
@@ -375,6 +385,7 @@ OWASP_LLM_CATEGORIES: Dict[str, OWASPCategory] = {
             "Use model obfuscation techniques when deploying to edge or untrusted environments",
             "Maintain comprehensive audit logs of all model access and usage"
         ],
+        compliance_frameworks=["NIST AI RMF", "ISO/IEC 42001", "EU AI Act", "NIST CSF 2.0", "SOC 2", "ISO/IEC 27001"],
     ),
 }
 

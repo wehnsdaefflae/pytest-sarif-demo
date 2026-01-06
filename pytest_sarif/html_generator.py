@@ -8,6 +8,7 @@ from collections import defaultdict
 
 from .models import TestResult
 from .owasp_metadata import get_owasp_category, get_owasp_markers_from_test
+from .compliance_mapper import get_frameworks_covered, get_compliance_summary
 
 
 class HTMLReportGenerator:
@@ -61,6 +62,9 @@ class HTMLReportGenerator:
         if security_policy and policy_violations is not None:
             policy_section = self._generate_policy_section(security_policy, policy_violations)
 
+        # Generate compliance framework section
+        compliance_section = self._generate_compliance_section(results)
+
         html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -85,6 +89,7 @@ class HTMLReportGenerator:
         {trend_section}
         {risk_section}
         {policy_section}
+        {compliance_section}
         {self._generate_summary_section(stats)}
         {self._generate_severity_section(stats)}
         {self._generate_owasp_section(stats, results)}
@@ -720,6 +725,60 @@ class HTMLReportGenerator:
             {violations_html}
         </section>"""
 
+    def _generate_compliance_section(self, results: List[TestResult]) -> str:
+        """Generate compliance framework coverage section."""
+        # Collect OWASP markers
+        all_owasp_markers = set()
+        for result in results:
+            owasp_markers = get_owasp_markers_from_test(result.markers)
+            all_owasp_markers.update(owasp_markers)
+
+        if not all_owasp_markers:
+            return ""
+
+        # Get compliance summary
+        frameworks = get_frameworks_covered(list(all_owasp_markers))
+        summary = get_compliance_summary(list(all_owasp_markers))
+
+        if not frameworks:
+            return ""
+
+        # Generate framework cards
+        framework_cards = ""
+        for framework in sorted(frameworks):
+            if framework in summary:
+                stats = summary[framework]
+                framework_cards += f"""
+                <div class="compliance-card">
+                    <h3>{framework}</h3>
+                    <div class="compliance-stats">
+                        <div class="compliance-stat">
+                            <span class="stat-value">{stats['total_controls']}</span>
+                            <span class="stat-label">Controls</span>
+                        </div>
+                        <div class="compliance-stat">
+                            <span class="stat-value">{stats['categories_covered']}</span>
+                            <span class="stat-label">Categories</span>
+                        </div>
+                        <div class="compliance-stat">
+                            <span class="stat-value">{stats['owasp_mapped']}/10</span>
+                            <span class="stat-label">OWASP Mapped</span>
+                        </div>
+                    </div>
+                </div>"""
+
+        return f"""
+        <section class="compliance-frameworks">
+            <h2>Compliance Framework Coverage</h2>
+            <p class="section-description">
+                This test suite validates security controls across {len(frameworks)} major compliance frameworks.
+                View the detailed <a href="compliance-report.html" target="_blank">Compliance Mapping Report</a> for full framework alignment.
+            </p>
+            <div class="compliance-grid">
+                {framework_cards}
+            </div>
+        </section>"""
+
     def _get_test_severity(self, result: TestResult) -> str:
         """Extract severity from test markers."""
         for severity in ["critical", "high", "medium", "low", "info"]:
@@ -1265,6 +1324,95 @@ section h2 {
 .test-remediation li {
     margin-bottom: 6px;
     line-height: 1.4;
+}
+
+/* Compliance Framework Styles */
+.compliance-frameworks {
+    background: white;
+    padding: 30px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin-bottom: 30px;
+}
+
+.compliance-frameworks h2 {
+    color: #2c3e50;
+    margin-bottom: 15px;
+    font-size: 1.8rem;
+}
+
+.compliance-frameworks .section-description {
+    color: #666;
+    margin-bottom: 25px;
+    font-size: 1rem;
+    line-height: 1.6;
+}
+
+.compliance-frameworks .section-description a {
+    color: #667eea;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.compliance-frameworks .section-description a:hover {
+    text-decoration: underline;
+}
+
+.compliance-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.compliance-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: 25px;
+    border-radius: 10px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    color: white;
+    transition: transform 0.2s;
+}
+
+.compliance-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+}
+
+.compliance-card h3 {
+    font-size: 1.2rem;
+    margin-bottom: 18px;
+    font-weight: 600;
+    color: white;
+}
+
+.compliance-stats {
+    display: flex;
+    justify-content: space-around;
+    gap: 15px;
+}
+
+.compliance-stat {
+    text-align: center;
+    background: rgba(255, 255, 255, 0.15);
+    padding: 12px;
+    border-radius: 8px;
+    flex: 1;
+}
+
+.compliance-stat .stat-value {
+    display: block;
+    font-size: 1.8rem;
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+.compliance-stat .stat-label {
+    display: block;
+    font-size: 0.75rem;
+    opacity: 0.9;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
 @media (max-width: 768px) {

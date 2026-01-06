@@ -12,6 +12,11 @@ from .owasp_metadata import (
     get_cwe_tags,
     get_security_tags,
 )
+from .compliance_mapper import (
+    get_compliance_mappings,
+    get_frameworks_covered,
+    get_compliance_summary,
+)
 
 
 class SARIFGenerator:
@@ -77,24 +82,53 @@ class SARIFGenerator:
             ]
         }
 
-        # Add baseline comparison properties if available
-        if baseline_analysis:
-            run["properties"] = {
-                "baseline_comparison": {
-                    "has_regressions": baseline_analysis.has_regressions,
-                    "has_improvements": baseline_analysis.has_improvements,
-                    "regression_count": baseline_analysis.regression_count,
-                    "improvement_count": baseline_analysis.improvement_count,
-                    "regressed_tests": baseline_analysis.regressed_tests,
-                    "fixed_tests": baseline_analysis.fixed_tests,
-                    "baseline_pass_rate": baseline_analysis.baseline_pass_rate,
-                    "current_pass_rate": baseline_analysis.current_pass_rate,
-                    "pass_rate_change": baseline_analysis.pass_rate_change,
-                    "severity_impact": baseline_analysis.severity_impact,
-                    "owasp_impact": baseline_analysis.owasp_impact,
-                    "regression_severity": baseline_analysis.regression_severity
+        # Collect OWASP markers for compliance mapping
+        all_owasp_markers = set()
+        for result in results:
+            owasp_markers = get_owasp_markers_from_test(result.markers)
+            all_owasp_markers.update(owasp_markers)
+
+        # Build properties object
+        properties = {}
+
+        # Add compliance framework coverage
+        if all_owasp_markers:
+            frameworks = get_frameworks_covered(list(all_owasp_markers))
+            summary = get_compliance_summary(list(all_owasp_markers))
+
+            properties["compliance_frameworks"] = {
+                "frameworks_covered": sorted(list(frameworks)),
+                "framework_count": len(frameworks),
+                "framework_summary": {
+                    framework: {
+                        "controls": summary[framework]["total_controls"],
+                        "categories": summary[framework]["categories_covered"],
+                        "owasp_mapped": summary[framework]["owasp_mapped"]
+                    }
+                    for framework in summary
                 }
             }
+
+        # Add baseline comparison properties if available
+        if baseline_analysis:
+            properties["baseline_comparison"] = {
+                "has_regressions": baseline_analysis.has_regressions,
+                "has_improvements": baseline_analysis.has_improvements,
+                "regression_count": baseline_analysis.regression_count,
+                "improvement_count": baseline_analysis.improvement_count,
+                "regressed_tests": baseline_analysis.regressed_tests,
+                "fixed_tests": baseline_analysis.fixed_tests,
+                "baseline_pass_rate": baseline_analysis.baseline_pass_rate,
+                "current_pass_rate": baseline_analysis.current_pass_rate,
+                "pass_rate_change": baseline_analysis.pass_rate_change,
+                "severity_impact": baseline_analysis.severity_impact,
+                "owasp_impact": baseline_analysis.owasp_impact,
+                "regression_severity": baseline_analysis.regression_severity
+            }
+
+        # Add properties to run if any exist
+        if properties:
+            run["properties"] = properties
 
         return run
 
@@ -146,6 +180,22 @@ class SARIFGenerator:
                 cwe_ids = get_cwe_tags(result.markers)
                 if cwe_ids:
                     properties["cwe"] = cwe_ids
+
+                # Add compliance framework mappings
+                if owasp_markers:
+                    compliance_mappings = get_compliance_mappings(owasp_markers[0])
+                    if compliance_mappings:
+                        frameworks = list(set(m.framework for m in compliance_mappings))
+                        properties["compliance-frameworks"] = frameworks
+                        properties["compliance-controls"] = [
+                            {
+                                "framework": m.framework,
+                                "control_id": m.control_id,
+                                "control_name": m.control_name,
+                                "category": m.category
+                            }
+                            for m in compliance_mappings
+                        ]
 
                 rule["properties"] = properties
 
