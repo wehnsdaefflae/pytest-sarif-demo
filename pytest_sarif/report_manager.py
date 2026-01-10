@@ -9,7 +9,6 @@ from .sarif_generator import SARIFGenerator
 from .html_generator import HTMLReportGenerator
 from .json_summary_generator import JSONSummaryGenerator
 from .markdown_generator import MarkdownReportGenerator
-from .compliance_generator import ComplianceReportGenerator
 
 
 logger = logging.getLogger(__name__)
@@ -43,7 +42,6 @@ class ReportManager:
         self.html_generator = HTMLReportGenerator(tool_name, tool_version)
         self.json_generator = JSONSummaryGenerator(tool_name, tool_version)
         self.markdown_generator = MarkdownReportGenerator(tool_name, tool_version)
-        self.compliance_generator = ComplianceReportGenerator(tool_name, tool_version)
 
     def generate_reports(
         self,
@@ -72,7 +70,7 @@ class ReportManager:
             Dict mapping format names to generated file paths
         """
         if formats is None:
-            formats = ["sarif", "html", "json", "markdown", "compliance"]
+            formats = ["sarif", "html", "json", "markdown"]
 
         if custom_paths is None:
             custom_paths = {}
@@ -132,17 +130,6 @@ class ReportManager:
             except Exception as e:
                 logger.error(f"Failed to generate Markdown report: {e}")
 
-        # Generate Compliance report
-        if "compliance" in formats:
-            compliance_path = custom_paths.get("compliance", self.output_dir / "compliance-report.html")
-            try:
-                compliance_content = self.compliance_generator.generate(results)
-                self._write_report(compliance_path, compliance_content)
-                generated_files["compliance"] = compliance_path
-                logger.info(f"Generated Compliance report: {compliance_path}")
-            except Exception as e:
-                logger.error(f"Failed to generate Compliance report: {e}")
-
         return generated_files
 
     def _write_report(self, path: Path, content: str):
@@ -156,87 +143,3 @@ class ReportManager:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content, encoding="utf-8")
 
-    def generate_sarif(self, results: List[TestResult], output_path: Optional[Path] = None) -> Path:
-        """Generate only SARIF report.
-
-        Args:
-            results: List of test results
-            output_path: Optional custom output path
-
-        Returns:
-            Path to generated SARIF file
-        """
-        if output_path is None:
-            output_path = self.output_dir / "pytest-results.sarif"
-
-        sarif_content = self.sarif_generator.generate(results)
-        self._write_report(output_path, sarif_content)
-        return output_path
-
-    def generate_html(self, results: List[TestResult], output_path: Optional[Path] = None) -> Path:
-        """Generate only HTML report.
-
-        Args:
-            results: List of test results
-            output_path: Optional custom output path
-
-        Returns:
-            Path to generated HTML file
-        """
-        if output_path is None:
-            output_path = self.output_dir / "pytest-results.html"
-
-        html_content = self.html_generator.generate(results)
-        self._write_report(output_path, html_content)
-        return output_path
-
-    def generate_json(self, results: List[TestResult], output_path: Optional[Path] = None) -> Path:
-        """Generate only JSON summary.
-
-        Args:
-            results: List of test results
-            output_path: Optional custom output path
-
-        Returns:
-            Path to generated JSON file
-        """
-        if output_path is None:
-            output_path = self.output_dir / "pytest-summary.json"
-
-        json_content = self.json_generator.generate(results)
-        self._write_report(output_path, json_content)
-        return output_path
-
-    def generate_markdown(self, results: List[TestResult], output_path: Optional[Path] = None) -> Path:
-        """Generate only Markdown report.
-
-        Args:
-            results: List of test results
-            output_path: Optional custom output path
-
-        Returns:
-            Path to generated Markdown file
-        """
-        if output_path is None:
-            output_path = self.output_dir / "pytest-results.md"
-
-        md_content = self.markdown_generator.generate(results)
-        self._write_report(output_path, md_content)
-        return output_path
-
-    def generate_compliance(self, results: List[TestResult], output_path: Optional[Path] = None) -> Path:
-        """Generate only Compliance report.
-
-        Args:
-            results: List of test results
-            output_path: Optional custom output path
-
-        Returns:
-            Path to generated Compliance file
-        """
-        if output_path is None:
-            output_path = self.output_dir / "compliance-report.html"
-
-        compliance_content = self.compliance_generator.generate(results)
-        self._write_report(output_path, compliance_content)
-        return output_path

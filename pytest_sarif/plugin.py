@@ -3,16 +3,16 @@
 import pytest
 from pathlib import Path
 from typing import List, Optional, Dict
-from collections import defaultdict
 
 from .sarif_generator import SARIFGenerator
 from .models import TestResult
-from .owasp_metadata import get_owasp_category, get_owasp_markers_from_test
+from .owasp_metadata import get_owasp_category
 from .report_manager import ReportManager
 from .trend_tracker import TrendTracker
 from .baseline_manager import BaselineManager
 from .policy_config import PolicyLoader, PolicyValidator
 from .risk_scorer import RiskScoringEngine
+from .statistics import calculate_statistics
 
 
 class SARIFPlugin:
@@ -97,42 +97,7 @@ class SARIFPlugin:
 
     def _generate_statistics(self) -> Dict:
         """Generate statistics about OWASP category coverage."""
-        stats = {
-            "total": len(self.results),
-            "failed": sum(1 for r in self.results if r.outcome == "failed"),
-            "passed": sum(1 for r in self.results if r.outcome == "passed"),
-            "total_tests": len(self.results),
-            "failed_tests": sum(1 for r in self.results if r.outcome == "failed"),
-            "passed_tests": sum(1 for r in self.results if r.outcome == "passed"),
-            "owasp_categories": defaultdict(lambda: {"total": 0, "failed": 0, "passed": 0}),
-            "severity_distribution": defaultdict(int),
-            "by_severity": defaultdict(lambda: {"total": 0, "failed": 0, "passed": 0}),
-        }
-
-        for result in self.results:
-            # Track OWASP category statistics
-            owasp_markers = get_owasp_markers_from_test(result.markers)
-            for marker in owasp_markers:
-                category = get_owasp_category(marker)
-                if category:
-                    stats["owasp_categories"][category.id]["total"] += 1
-                    if result.outcome == "failed":
-                        stats["owasp_categories"][category.id]["failed"] += 1
-                    elif result.outcome == "passed":
-                        stats["owasp_categories"][category.id]["passed"] += 1
-
-            # Track severity distribution
-            for marker in ["critical", "high", "medium", "low", "info"]:
-                if marker in result.markers:
-                    stats["severity_distribution"][marker] += 1
-                    stats["by_severity"][marker]["total"] += 1
-                    if result.outcome == "failed":
-                        stats["by_severity"][marker]["failed"] += 1
-                    elif result.outcome == "passed":
-                        stats["by_severity"][marker]["passed"] += 1
-                    break
-
-        return stats
+        return calculate_statistics(self.results)
 
     def _print_summary(
         self,
@@ -148,9 +113,9 @@ class SARIFPlugin:
         print("=" * 70)
 
         # Overall statistics
-        print(f"\nTotal Tests:  {stats['total_tests']}")
-        print(f"Passed:       {stats['passed_tests']}")
-        print(f"Failed:       {stats['failed_tests']}")
+        print(f"\nTotal Tests:  {stats['total']}")
+        print(f"Passed:       {stats['passed']}")
+        print(f"Failed:       {stats['failed']}")
 
         # Baseline comparison summary
         if baseline_analysis:
@@ -175,13 +140,11 @@ class SARIFPlugin:
         # Trend analytics summary
         if trend_analytics and trend_analytics.get("has_history"):
             comparison = trend_analytics.get("comparison", {})
-            risk = trend_analytics.get("risk_score", {})
 
             print(f"\nTrend Analysis:")
             print(f"  Total Runs:   {trend_analytics['total_runs']}")
             print(f"  Trend:        {comparison.get('trend', 'unknown').upper()}")
             print(f"  Pass Rate:    {comparison.get('pass_rate_change', 0):+.2f}%")
-            print(f"  Risk Level:   {risk.get('level', 'unknown').upper()} ({risk.get('score', 0):.1f}/100)")
 
             # Show flaky tests warning
             flakiness = trend_analytics.get("flakiness", {})

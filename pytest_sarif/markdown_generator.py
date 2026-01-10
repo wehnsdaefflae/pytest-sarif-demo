@@ -6,6 +6,7 @@ from collections import defaultdict
 
 from .models import TestResult
 from .owasp_metadata import get_owasp_category, get_owasp_markers_from_test
+from .statistics import calculate_statistics, get_test_severity
 
 
 class MarkdownReportGenerator:
@@ -58,35 +59,11 @@ class MarkdownReportGenerator:
 
     def _calculate_statistics(self, results: List[TestResult]) -> Dict[str, Any]:
         """Calculate comprehensive statistics from test results."""
-        stats = {
-            "total": len(results),
-            "passed": sum(1 for r in results if r.outcome == "passed"),
-            "failed": sum(1 for r in results if r.outcome == "failed"),
-            "skipped": sum(1 for r in results if r.outcome == "skipped"),
-            "severity": defaultdict(int),
-            "owasp_categories": defaultdict(lambda: {"total": 0, "passed": 0, "failed": 0, "skipped": 0}),
-        }
-
-        for result in results:
-            # Track severity
-            for severity in ["critical", "high", "medium", "low", "info"]:
-                if severity in result.markers:
-                    stats["severity"][severity] += 1
-                    break
-
-            # Track OWASP categories
-            owasp_markers = get_owasp_markers_from_test(result.markers)
-            for marker in owasp_markers:
-                category = get_owasp_category(marker)
-                if category:
-                    stats["owasp_categories"][category.id]["total"] += 1
-                    if result.outcome == "passed":
-                        stats["owasp_categories"][category.id]["passed"] += 1
-                    elif result.outcome == "failed":
-                        stats["owasp_categories"][category.id]["failed"] += 1
-                    elif result.outcome == "skipped":
-                        stats["owasp_categories"][category.id]["skipped"] += 1
-
+        stats = calculate_statistics(results)
+        # Add skipped count for Markdown report
+        stats["skipped"] = sum(1 for r in results if r.outcome == "skipped")
+        # Alias severity_distribution to severity for Markdown compatibility
+        stats["severity"] = stats["severity_distribution"]
         return stats
 
     def _generate_summary_section(self, stats: Dict) -> str:
@@ -208,7 +185,7 @@ Found **{len(failed_results)}** failing test(s):
 """
 
         for i, result in enumerate(failed_results, 1):
-            severity = self._get_test_severity(result)
+            severity = get_test_severity(result)
             severity_emoji = {"critical": "🔴", "high": "🟠", "medium": "🟡", "low": "🔵", "info": "⚪"}.get(severity, "⚪")
 
             owasp_markers = get_owasp_markers_from_test(result.markers)
@@ -252,12 +229,6 @@ Found **{len(failed_results)}** failing test(s):
 
         return failures_section
 
-    def _get_test_severity(self, result: TestResult) -> str:
-        """Extract severity from test markers."""
-        for severity in ["critical", "high", "medium", "low", "info"]:
-            if severity in result.markers:
-                return severity
-        return "medium"
 
     def _get_severity_color(self, severity: str) -> str:
         """Get color code for severity badges."""

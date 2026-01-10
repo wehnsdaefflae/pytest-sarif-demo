@@ -7,6 +7,7 @@ from collections import defaultdict
 
 from .models import TestResult
 from .owasp_metadata import get_owasp_category, get_owasp_markers_from_test, get_cwe_tags
+from .statistics import get_test_severity
 
 
 class JSONSummaryGenerator:
@@ -195,7 +196,7 @@ class JSONSummaryGenerator:
                         "name": category.name
                     })
 
-            severity = self._get_test_severity(result)
+            severity = get_test_severity(result)
             cwe_ids = get_cwe_tags(result.markers)
 
             test_results.append({
@@ -235,7 +236,7 @@ class JSONSummaryGenerator:
                     "test_name": result.test_name,
                     "file": result.file_path,
                     "line": result.line_number,
-                    "severity": self._get_test_severity(result),
+                    "severity": get_test_severity(result),
                     "owasp_category": owasp_category,
                     "error_message": result.longrepr,
                     "duration": round(result.duration, 3)
@@ -243,9 +244,3 @@ class JSONSummaryGenerator:
 
         return failures
 
-    def _get_test_severity(self, result: TestResult) -> str:
-        """Extract severity from test markers."""
-        for severity in ["critical", "high", "medium", "low", "info"]:
-            if severity in result.markers:
-                return severity
-        return "unspecified"

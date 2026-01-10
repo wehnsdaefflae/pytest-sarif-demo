@@ -76,7 +76,6 @@ class TrendTracker:
             "comparison": self._compare_with_previous(current_summary, previous_runs[-1]["summary"]),
             "trends": self._calculate_trends(previous_runs),
             "flakiness": self._detect_flaky_tests(previous_runs, results),
-            "risk_score": self._calculate_risk_score(current_summary),
             "improvement_rate": self._calculate_improvement_rate(previous_runs),
             "owasp_category_trends": self._calculate_owasp_trends(previous_runs)
         }
@@ -242,55 +241,6 @@ class TrendTracker:
             "count": len(flaky_tests)
         }
 
-    def _calculate_risk_score(self, summary: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Calculate overall security risk score based on failures and severity.
-
-        Risk score is 0-100 where:
-        - 0-20: Low risk
-        - 21-50: Medium risk
-        - 51-80: High risk
-        - 81-100: Critical risk
-        """
-        if summary["total_tests"] == 0:
-            return {"score": 0, "level": "unknown"}
-
-        # Base risk from failure rate
-        fail_rate = (summary["failed"] / summary["total_tests"]) * 100
-        base_risk = fail_rate
-
-        # Severity multipliers
-        severity_dist = summary.get("severity_distribution", {})
-        severity_weight = (
-            severity_dist.get("critical", 0) * 2.0 +
-            severity_dist.get("high", 0) * 1.5 +
-            severity_dist.get("medium", 0) * 1.0 +
-            severity_dist.get("low", 0) * 0.5
-        )
-
-        # Calculate weighted risk score
-        if summary["total_tests"] > 0:
-            weighted_risk = min(100, base_risk + (severity_weight / summary["total_tests"] * 20))
-        else:
-            weighted_risk = 0
-
-        risk_score = round(weighted_risk, 2)
-
-        # Determine risk level
-        if risk_score <= 20:
-            level = "low"
-        elif risk_score <= 50:
-            level = "medium"
-        elif risk_score <= 80:
-            level = "high"
-        else:
-            level = "critical"
-
-        return {
-            "score": risk_score,
-            "level": level,
-            "fail_rate": round(fail_rate, 2)
-        }
 
     def _calculate_improvement_rate(self, runs: List[Dict]) -> Optional[Dict[str, Any]]:
         """Calculate the rate of improvement over recent runs."""
