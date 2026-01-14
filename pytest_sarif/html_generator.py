@@ -9,7 +9,7 @@ from collections import defaultdict
 from .models import TestResult
 from .owasp_metadata import get_owasp_category, get_owasp_markers_from_test
 from .compliance_mapper import get_frameworks_covered, get_compliance_summary
-from .statistics import calculate_statistics, get_test_severity
+from .statistics import calculate_statistics, get_test_severity, get_owasp_markers
 
 
 class HTMLReportGenerator:
@@ -41,7 +41,7 @@ class HTMLReportGenerator:
         Returns:
             HTML formatted report
         """
-        stats = self._calculate_statistics(results)
+        stats = calculate_statistics(results)
 
         # Generate baseline section HTML if analysis available
         baseline_section = ""
@@ -105,15 +105,6 @@ class HTMLReportGenerator:
 </html>"""
 
         return html
-
-    def _calculate_statistics(self, results: List[TestResult]) -> Dict[str, Any]:
-        """Calculate comprehensive statistics from test results."""
-        stats = calculate_statistics(results)
-        # Add skipped count for HTML report
-        stats["skipped"] = sum(1 for r in results if r.outcome == "skipped")
-        # Alias severity_distribution to severity for HTML compatibility
-        stats["severity"] = stats["severity_distribution"]
-        return stats
 
     def _generate_summary_section(self, stats: Dict) -> str:
         """Generate summary statistics section."""
@@ -704,11 +695,7 @@ class HTMLReportGenerator:
 
     def _generate_compliance_section(self, results: List[TestResult]) -> str:
         """Generate compliance framework coverage section."""
-        # Collect OWASP markers
-        all_owasp_markers = set()
-        for result in results:
-            owasp_markers = get_owasp_markers_from_test(result.markers)
-            all_owasp_markers.update(owasp_markers)
+        all_owasp_markers = get_owasp_markers(results)
 
         if not all_owasp_markers:
             return ""

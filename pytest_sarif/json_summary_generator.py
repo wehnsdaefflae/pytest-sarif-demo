@@ -3,11 +3,10 @@
 import json
 from datetime import datetime
 from typing import List, Dict, Any, Optional
-from collections import defaultdict
 
 from .models import TestResult
 from .owasp_metadata import get_owasp_category, get_owasp_markers_from_test, get_cwe_tags
-from .statistics import get_test_severity
+from .statistics import calculate_statistics, get_test_severity
 
 
 class JSONSummaryGenerator:
@@ -39,6 +38,8 @@ class JSONSummaryGenerator:
         Returns:
             JSON formatted summary report
         """
+        stats = calculate_statistics(results)
+
         summary = {
             "metadata": {
                 "tool": self.tool_name,
@@ -46,9 +47,17 @@ class JSONSummaryGenerator:
                 "generated_at": datetime.now().isoformat(),
                 "report_format": "json-summary-v2.0"
             },
-            "summary": self._generate_summary(results),
-            "severity_distribution": self._generate_severity_distribution(results),
-            "owasp_coverage": self._generate_owasp_coverage(results),
+            "summary": {
+                "total_tests": stats["total"],
+                "passed": stats["passed"],
+                "failed": stats["failed"],
+                "skipped": stats["skipped"],
+                "pass_rate": stats["pass_rate"],
+                "fail_rate": stats["fail_rate"],
+                "total_duration": stats["total_duration"]
+            },
+            "severity_distribution": dict(stats["severity_distribution"]),
+            "owasp_coverage": self._generate_owasp_coverage(results, stats),
             "test_results": self._generate_test_results(results),
             "failures": self._generate_failures(results)
         }
@@ -104,81 +113,27 @@ class JSONSummaryGenerator:
 
         return json.dumps(summary, indent=2, ensure_ascii=False)
 
-    def _generate_summary(self, results: List[TestResult]) -> Dict[str, Any]:
-        """Generate overall summary statistics."""
-        total = len(results)
-        passed = sum(1 for r in results if r.outcome == "passed")
-        failed = sum(1 for r in results if r.outcome == "failed")
-        skipped = sum(1 for r in results if r.outcome == "skipped")
+    def _generate_owasp_coverage(self, results: List[TestResult], stats: Dict) -> Dict[str, Any]:
+        """Generate OWASP category coverage with metadata from pre-calculated stats."""
+        owasp_coverage = {}
 
-        return {
-            "total_tests": total,
-            "passed": passed,
-            "failed": failed,
-            "skipped": skipped,
-            "pass_rate": round((passed / total * 100), 2) if total > 0 else 0,
-            "fail_rate": round((failed / total * 100), 2) if total > 0 else 0,
-            "total_duration": round(sum(r.duration for r in results), 3)
-        }
+        for cat_id, cat_stats in stats["owasp_categories"].items():
+            category = get_owasp_category(f"owasp_{cat_id.lower()}")
+            if category:
+                total = cat_stats["total"]
+                owasp_coverage[cat_id] = {
+                    "total_tests": total,
+                    "passed": cat_stats["passed"],
+                    "failed": cat_stats["failed"],
+                    "skipped": cat_stats.get("skipped", 0),
+                    "pass_rate": round((cat_stats["passed"] / total * 100), 2) if total > 0 else 0,
+                    "category_name": category.name,
+                    "description": category.description,
+                    "cwe_ids": category.cwe_ids,
+                    "tags": category.tags
+                }
 
-    def _generate_severity_distribution(self, results: List[TestResult]) -> Dict[str, int]:
-        """Generate severity distribution statistics."""
-        severity_dist = {"critical": 0, "high": 0, "medium": 0, "low": 0, "info": 0, "unspecified": 0}
-
-        for result in results:
-            severity_found = False
-            for severity in ["critical", "high", "medium", "low", "info"]:
-                if severity in result.markers:
-                    severity_dist[severity] += 1
-                    severity_found = True
-                    break
-
-            if not severity_found:
-                severity_dist["unspecified"] += 1
-
-        return severity_dist
-
-    def _generate_owasp_coverage(self, results: List[TestResult]) -> Dict[str, Any]:
-        """Generate OWASP category coverage statistics."""
-        owasp_stats = defaultdict(lambda: {
-            "total_tests": 0,
-            "passed": 0,
-            "failed": 0,
-            "skipped": 0,
-            "category_name": "",
-            "description": "",
-            "cwe_ids": [],
-            "tags": []
-        })
-
-        for result in results:
-            owasp_markers = get_owasp_markers_from_test(result.markers)
-            for marker in owasp_markers:
-                category = get_owasp_category(marker)
-                if category:
-                    cat_id = category.id
-                    owasp_stats[cat_id]["category_name"] = category.name
-                    owasp_stats[cat_id]["description"] = category.description
-                    owasp_stats[cat_id]["cwe_ids"] = category.cwe_ids
-                    owasp_stats[cat_id]["tags"] = category.tags
-                    owasp_stats[cat_id]["total_tests"] += 1
-
-                    if result.outcome == "passed":
-                        owasp_stats[cat_id]["passed"] += 1
-                    elif result.outcome == "failed":
-                        owasp_stats[cat_id]["failed"] += 1
-                    elif result.outcome == "skipped":
-                        owasp_stats[cat_id]["skipped"] += 1
-
-        # Calculate pass rates for each category
-        for cat_id, stats in owasp_stats.items():
-            total = stats["total_tests"]
-            if total > 0:
-                stats["pass_rate"] = round((stats["passed"] / total * 100), 2)
-            else:
-                stats["pass_rate"] = 0
-
-        return dict(owasp_stats)
+        return owasp_coverage
 
     def _generate_test_results(self, results: List[TestResult]) -> List[Dict[str, Any]]:
         """Generate detailed test results."""
