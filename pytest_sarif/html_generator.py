@@ -108,8 +108,6 @@ class HTMLReportGenerator:
 
     def _generate_summary_section(self, stats: Dict) -> str:
         """Generate summary statistics section."""
-        pass_rate = (stats["passed"] / stats["total"] * 100) if stats["total"] > 0 else 0
-
         return f"""
         <section class="summary">
             <h2>Summary</h2>
@@ -127,7 +125,7 @@ class HTMLReportGenerator:
                     <div class="stat-label">Failed</div>
                 </div>
                 <div class="stat-card pass-rate">
-                    <div class="stat-value">{pass_rate:.1f}%</div>
+                    <div class="stat-value">{stats["pass_rate"]:.1f}%</div>
                     <div class="stat-label">Pass Rate</div>
                 </div>
             </div>

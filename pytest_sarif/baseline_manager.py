@@ -7,7 +7,8 @@ from datetime import datetime
 from dataclasses import dataclass, field, asdict
 
 from .models import TestResult
-from .owasp_metadata import get_owasp_markers_from_test, get_owasp_category
+from .owasp_metadata import get_owasp_markers_from_test
+from .statistics import get_test_severity
 
 
 @dataclass
@@ -45,11 +46,8 @@ class BaselineSnapshot:
         for result in results:
             test_outcomes[result.nodeid] = result.outcome
 
-            # Extract severity
-            for severity in ["critical", "high", "medium", "low", "info"]:
-                if severity in result.markers:
-                    test_severities[result.nodeid] = severity
-                    break
+            # Extract severity using centralized function
+            test_severities[result.nodeid] = get_test_severity(result)
 
             # Extract OWASP categories
             owasp_markers = get_owasp_markers_from_test(result.markers)

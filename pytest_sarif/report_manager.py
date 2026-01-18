@@ -9,6 +9,7 @@ from .sarif_generator import SARIFGenerator
 from .html_generator import HTMLReportGenerator
 from .json_summary_generator import JSONSummaryGenerator
 from .markdown_generator import MarkdownReportGenerator
+from .console_summary import generate_console_summary
 
 
 logger = logging.getLogger(__name__)
@@ -129,6 +130,18 @@ class ReportManager:
                 logger.info(f"Generated Markdown report: {md_path}")
             except Exception as e:
                 logger.error(f"Failed to generate Markdown report: {e}")
+
+        # Generate console output (for CI/CD pipelines)
+        if "console" in formats:
+            try:
+                console_output = generate_console_summary(
+                    results, risk_score, show_colors=True, verbose=True
+                )
+                print(console_output)
+                generated_files["console"] = "stdout"
+                logger.info("Generated console summary output")
+            except Exception as e:
+                logger.error(f"Failed to generate console summary: {e}")
 
         return generated_files
 

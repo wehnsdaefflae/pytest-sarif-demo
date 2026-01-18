@@ -7,7 +7,7 @@ from typing import List, Dict, Any, Optional
 from collections import defaultdict
 
 from .models import TestResult
-from .owasp_metadata import get_owasp_category, get_owasp_markers_from_test
+from .statistics import calculate_statistics, get_test_severity
 
 
 class TrendTracker:
@@ -99,42 +99,18 @@ class TrendTracker:
             json.dump(history, f, indent=2)
 
     def _generate_run_summary(self, results: List[TestResult]) -> Dict[str, Any]:
-        """Generate summary statistics for a test run."""
-        total = len(results)
-        passed = sum(1 for r in results if r.outcome == "passed")
-        failed = sum(1 for r in results if r.outcome == "failed")
-        skipped = sum(1 for r in results if r.outcome == "skipped")
-
-        severity_dist = defaultdict(int)
-        owasp_stats = defaultdict(lambda: {"total": 0, "failed": 0, "passed": 0})
-
-        for result in results:
-            # Track severity
-            for severity in ["critical", "high", "medium", "low", "info"]:
-                if severity in result.markers:
-                    severity_dist[severity] += 1
-                    break
-
-            # Track OWASP categories
-            owasp_markers = get_owasp_markers_from_test(result.markers)
-            for marker in owasp_markers:
-                category = get_owasp_category(marker)
-                if category:
-                    owasp_stats[category.id]["total"] += 1
-                    if result.outcome == "failed":
-                        owasp_stats[category.id]["failed"] += 1
-                    elif result.outcome == "passed":
-                        owasp_stats[category.id]["passed"] += 1
+        """Generate summary statistics for a test run using centralized statistics."""
+        stats = calculate_statistics(results)
 
         return {
-            "total_tests": total,
-            "passed": passed,
-            "failed": failed,
-            "skipped": skipped,
-            "pass_rate": round((passed / total * 100), 2) if total > 0 else 0,
-            "total_duration": round(sum(r.duration for r in results), 3),
-            "severity_distribution": dict(severity_dist),
-            "owasp_categories": dict(owasp_stats)
+            "total_tests": stats["total"],
+            "passed": stats["passed"],
+            "failed": stats["failed"],
+            "skipped": stats["skipped"],
+            "pass_rate": stats["pass_rate"],
+            "total_duration": stats["total_duration"],
+            "severity_distribution": dict(stats["severity_distribution"]),
+            "owasp_categories": {k: dict(v) for k, v in stats["owasp_categories"].items()}
         }
 
     def _serialize_test_result(self, result: TestResult) -> Dict[str, Any]:

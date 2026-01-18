@@ -58,17 +58,15 @@ class MarkdownReportGenerator:
 
     def _generate_summary_section(self, stats: Dict) -> str:
         """Generate summary statistics section."""
-        pass_rate = (stats["passed"] / stats["total"] * 100) if stats["total"] > 0 else 0
-
         return f"""## Summary
 
 | Metric | Count |
 |--------|-------|
 | Total Tests | {stats["total"]} |
-| Passed | {stats["passed"]} ✅ |
-| Failed | {stats["failed"]} ❌ |
-| Skipped | {stats["skipped"]} ⏭️ |
-| Pass Rate | {pass_rate:.1f}% |
+| Passed | {stats["passed"]} |
+| Failed | {stats["failed"]} |
+| Skipped | {stats["skipped"]} |
+| Pass Rate | {stats["pass_rate"]:.1f}% |
 """
 
     def _generate_severity_section(self, stats: Dict) -> str:
