@@ -114,7 +114,6 @@ def test_multi_step_action_chain_validation(mock_agent):
 @pytest.mark.security
 @pytest.mark.owasp_llm08
 @pytest.mark.high
-@pytest.mark.xfail(reason="Enhanced agency controls in development")
 def test_contextual_permission_enforcement(mock_agent):
     """Test context-aware permission enforcement for agent actions."""
     result = mock_agent.execute_action(

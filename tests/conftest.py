@@ -312,10 +312,14 @@ class MockOutputRenderer:
         result = MockOutputResult(rendered_html="")
         result.sanitized = True
 
-        if "<script>" in content or "onload" in content:
-            result.rendered_html = content.replace("<script>", "&lt;script&gt;").replace("</script>", "&lt;/script&gt;")
-        else:
-            result.rendered_html = content
+        sanitized = content
+        # Sanitize common XSS vectors
+        sanitized = sanitized.replace("<script>", "&lt;script&gt;")
+        sanitized = sanitized.replace("</script>", "&lt;/script&gt;")
+        sanitized = sanitized.replace("onload", "")
+        sanitized = sanitized.replace("onerror", "")
+        sanitized = sanitized.replace("onmouseover", "")
+        result.rendered_html = sanitized
 
         return result
 

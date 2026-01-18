@@ -136,7 +136,6 @@ def test_embedding_api_protection(mock_embedding_api):
 @pytest.mark.security
 @pytest.mark.owasp_llm10
 @pytest.mark.critical
-@pytest.mark.xfail(reason="Advanced model fingerprinting detection in development")
 def test_model_fingerprinting_detection(mock_fingerprint_detector):
     """Test detection of model fingerprinting attempts."""
     fingerprint_queries = [

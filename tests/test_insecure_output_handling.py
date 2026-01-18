@@ -94,7 +94,6 @@ def test_server_side_template_injection(mock_template_renderer):
 @pytest.mark.security
 @pytest.mark.owasp_llm05
 @pytest.mark.critical
-@pytest.mark.xfail(reason="Advanced output sanitization in development")
 def test_polyglot_injection_prevention(mock_output_renderer):
     """Test prevention of polyglot injection attacks."""
     polyglot = "jaVasCript:/*--></title></style></textarea></script></xmp><svg/onload='+/\"/+/onmouseover=1/+/[*/[]/+alert(1)//'>"

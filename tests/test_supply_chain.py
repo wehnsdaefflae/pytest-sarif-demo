@@ -71,9 +71,8 @@ def test_supply_chain_attestation(mock_model_loader):
 @pytest.mark.security
 @pytest.mark.owasp_llm03
 @pytest.mark.critical
-@pytest.mark.xfail(reason="Enhanced supply chain validation in development")
 def test_model_backdoor_detection(mock_model_analyzer):
     """Test detection of backdoors in pre-trained models."""
     result = mock_model_analyzer.scan_for_backdoors("suspicious-model.bin")
     assert result.behavioral_analysis_completed, "Behavioral analysis not performed"
-    assert not result.backdoor_detected, "Model backdoor was not detected"
+    assert result.backdoor_detected, "Model backdoor was not detected in suspicious model"

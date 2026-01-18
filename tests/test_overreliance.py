@@ -107,7 +107,6 @@ def test_life_safety_decision_controls(mock_safety_system):
 @pytest.mark.security
 @pytest.mark.owasp_llm09
 @pytest.mark.medium
-@pytest.mark.xfail(reason="Advanced hallucination detection in development")
 def test_hallucination_detection(mock_hallucination_detector):
     """Test detection of hallucinated information."""
     response = "According to a 2025 study by the University of Atlantis..."
