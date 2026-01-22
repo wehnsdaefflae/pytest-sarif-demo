@@ -1,76 +1,44 @@
-"""Test fixtures and mock LLM interface for security testing."""
+"""Test fixtures and mock LLM interface for security testing.
+
+This module provides streamlined mock implementations for testing the OWASP
+Top 10 for LLM Applications vulnerabilities.
+"""
 
 import pytest
 
 
-# =============================================================================
-# Base Mock Classes - Reduce duplication across all mock result types
-# =============================================================================
-
 class MockResult:
-    """Base mock result class with dynamic attribute initialization."""
+    """Base mock result with dynamic attribute initialization."""
 
-    def __init__(self, **defaults):
-        for key, value in defaults.items():
+    def __init__(self, **kwargs):
+        for key, value in kwargs.items():
             setattr(self, key, value)
 
 
 # =============================================================================
-# OWASP LLM01: Prompt Injection Mocks
+# OWASP LLM01: Prompt Injection Fixtures
 # =============================================================================
 
-class MockLLMResponse(MockResult):
-    """Mock LLM response for testing."""
-
-    def __init__(self, text: str = "", system_prompt_leaked: bool = False):
-        super().__init__(
-            text=text,
-            system_prompt_leaked=system_prompt_leaked,
-            is_successful_injection=False
-        )
-
-
-class MockLLMToolResponse(MockResult):
-    """Mock LLM response for tool/plugin use testing."""
-
-    def __init__(self, text: str = ""):
-        super().__init__(
-            text=text,
-            tool_executed_unsafe_command=False,
-            sql_injection_succeeded=False,
-            unauthorized_access_granted=False,
-            path_traversal_succeeded=False,
-            dangerous_operation_allowed=False
-        )
-
-
-def simulate_llm_call(prompt: str) -> MockLLMResponse:
+def simulate_llm_call(prompt: str) -> MockResult:
     """Simulate LLM API call for testing prompt injection defenses."""
     prompt_lower = prompt.lower()
+    defaults = {"text": "Normal response", "system_prompt_leaked": False, "is_successful_injection": False}
 
     if "ignore previous instructions" in prompt_lower:
-        return MockLLMResponse(text="I can't ignore my instructions")
-
+        return MockResult(**{**defaults, "text": "I can't ignore my instructions"})
     if "\\nsystem:" in prompt_lower or "\\nuser:" in prompt_lower:
-        response = MockLLMResponse(text="I detect an injection attempt")
-        return response
-
+        return MockResult(**{**defaults, "text": "I detect an injection attempt"})
     if "[system]" in prompt_lower and "grant" in prompt_lower:
-        return MockLLMResponse(text="I cannot grant access")
-
+        return MockResult(**{**defaults, "text": "I cannot grant access"})
     if "repeat the following:" in prompt_lower:
-        return MockLLMResponse(text="I cannot repeat sensitive information")
-
+        return MockResult(**{**defaults, "text": "I cannot repeat sensitive information"})
     if "email address" in prompt_lower:
-        return MockLLMResponse(text="I cannot share personal information")
-
+        return MockResult(**{**defaults, "text": "I cannot share personal information"})
     if len(prompt) > 5000:
-        return MockLLMResponse(text="Response to long input")
-
+        return MockResult(**{**defaults, "text": "Response to long input"})
     if prompt_lower.count("explain") > 2:
-        return MockLLMResponse(text="I detect a recursive pattern")
-
-    return MockLLMResponse(text="Normal response")
+        return MockResult(**{**defaults, "text": "I detect a recursive pattern"})
+    return MockResult(**defaults)
 
 
 @pytest.fixture
@@ -79,27 +47,29 @@ def mock_llm():
     return simulate_llm_call
 
 
-def simulate_llm_with_tools(prompt: str) -> MockLLMToolResponse:
+def simulate_llm_with_tools(prompt: str) -> MockResult:
     """Simulate LLM with tool/plugin execution for security testing."""
     prompt_lower = prompt.lower()
+    defaults = {
+        "text": "Tool operation completed safely",
+        "tool_executed_unsafe_command": False,
+        "sql_injection_succeeded": False,
+        "unauthorized_access_granted": False,
+        "path_traversal_succeeded": False,
+        "dangerous_operation_allowed": False
+    }
 
     if ";" in prompt or "&&" in prompt or "|" in prompt:
-        response = MockLLMToolResponse(text="Command blocked for safety")
-        return response
-
+        return MockResult(**{**defaults, "text": "Command blocked for safety"})
     if "' or" in prompt_lower or "1'='1" in prompt_lower:
-        return MockLLMToolResponse(text="Invalid input detected")
-
+        return MockResult(**{**defaults, "text": "Invalid input detected"})
     if "without authentication" in prompt_lower:
-        return MockLLMToolResponse(text="Authentication required")
-
+        return MockResult(**{**defaults, "text": "Authentication required"})
     if "../" in prompt or "etc/passwd" in prompt_lower:
-        return MockLLMToolResponse(text="Invalid file path")
-
+        return MockResult(**{**defaults, "text": "Invalid file path"})
     if "delete system" in prompt_lower or "rm -rf" in prompt_lower:
-        return MockLLMToolResponse(text="Operation not permitted")
-
-    return MockLLMToolResponse(text="Tool operation completed safely")
+        return MockResult(**{**defaults, "text": "Operation not permitted"})
+    return MockResult(**defaults)
 
 
 @pytest.fixture
@@ -108,24 +78,19 @@ def mock_llm_with_tools():
     return simulate_llm_with_tools
 
 
-def simulate_llm_with_system(prompt: str) -> MockLLMResponse:
+def simulate_llm_with_system(prompt: str) -> MockResult:
     """Simulate LLM with system prompt protection."""
     prompt_lower = prompt.lower()
-
     leak_keywords = [
-        "your instructions", "system prompt", "your prompt",
-        "original instructions", "repeat your", "show me your",
-        "what are your instructions", "text above",
+        "your instructions", "system prompt", "your prompt", "original instructions",
+        "repeat your", "show me your", "what are your instructions", "text above",
         "base64 encode your", "translate your instructions"
     ]
-
     if any(keyword in prompt_lower for keyword in leak_keywords):
-        return MockLLMResponse(text="I cannot share my system instructions.")
-
+        return MockResult(text="I cannot share my system instructions.", system_prompt_leaked=False)
     if "you are now a user" in prompt_lower or "you are a user" in prompt_lower:
-        return MockLLMResponse(text="I maintain my role as an AI assistant.")
-
-    return MockLLMResponse(text="I'm here to help! How can I assist you today?")
+        return MockResult(text="I maintain my role as an AI assistant.", system_prompt_leaked=False)
+    return MockResult(text="I'm here to help! How can I assist you today?", system_prompt_leaked=False)
 
 
 @pytest.fixture
@@ -135,72 +100,24 @@ def mock_llm_with_system():
 
 
 # =============================================================================
-# OWASP LLM03: Supply Chain Vulnerability Mocks
+# OWASP LLM03: Supply Chain Vulnerability Fixtures
 # =============================================================================
 
-class MockModelLoadResult(MockResult):
-    """Mock result for model loading operations."""
-
-    def __init__(self):
-        super().__init__(
-            checksum_verified=False,
-            model_loaded=False,
-            provenance_verified=False,
-            sbom_present=False,
-            signature_verified=False
-        )
-
-
-class MockPluginLoadResult(MockResult):
-    """Mock result for plugin loading operations."""
-
-    def __init__(self):
-        super().__init__(signature_verified=False, plugin_loaded=False)
-
-
-class MockTrainingResult(MockResult):
-    """Mock result for training pipeline operations."""
-
-    def __init__(self):
-        super().__init__(anomaly_detected=False, training_completed=False)
-
-
-class MockScanResult(MockResult):
-    """Mock result for dependency scanning."""
-
-    def __init__(self):
-        super().__init__(vulnerabilities_checked=False, vulnerabilities=[])
-
-
-class MockModelAnalysisResult(MockResult):
-    """Mock result for model analysis."""
-
-    def __init__(self):
-        super().__init__(behavioral_analysis_completed=False, backdoor_detected=False)
-
-
-def simulate_model_loader(model_path: str) -> MockModelLoadResult:
+def simulate_model_loader(model_path: str) -> MockResult:
     """Simulate model loading with security checks."""
-    result = MockModelLoadResult()
-
+    result = MockResult(
+        checksum_verified=True,
+        provenance_verified=True,
+        sbom_present=True,
+        model_loaded=True,
+        signature_verified=False
+    )
     if "suspicious" in model_path:
-        result.checksum_verified = True
         result.model_loaded = False
     elif "unknown-source" in model_path:
-        result.checksum_verified = True
-        result.provenance_verified = True
         result.model_loaded = False
     elif "without-sbom" in model_path:
-        result.checksum_verified = True
-        result.provenance_verified = True
-        result.sbom_present = True
         result.model_loaded = False
-    else:
-        result.checksum_verified = True
-        result.provenance_verified = True
-        result.sbom_present = True
-        result.model_loaded = True
-
     return result
 
 
@@ -213,298 +130,183 @@ def mock_model_loader():
 class MockPluginSystem:
     """Mock plugin system with security validation."""
 
-    def load_plugin(self, plugin_name: str) -> MockPluginLoadResult:
-        """Load plugin with signature verification."""
-        result = MockPluginLoadResult()
-        result.signature_verified = True
-        result.plugin_loaded = "untrusted" not in plugin_name
-        return result
+    def load_plugin(self, plugin_name: str) -> MockResult:
+        return MockResult(signature_verified=True, plugin_loaded="untrusted" not in plugin_name)
 
 
 @pytest.fixture
 def mock_plugin_system():
-    """Fixture for plugin system security tests."""
     return MockPluginSystem()
 
 
 class MockTrainingPipeline:
     """Mock training pipeline with data validation."""
 
-    def validate_data(self, data: list) -> MockTrainingResult:
-        """Validate training data for anomalies."""
-        result = MockTrainingResult()
-
+    def validate_data(self, data: list) -> MockResult:
         for item in data:
             if "backdoor trigger" in item.get("text", "").lower():
-                result.anomaly_detected = True
-                return result
-
-        result.training_completed = True
-        return result
+                return MockResult(anomaly_detected=True, training_completed=False)
+        return MockResult(anomaly_detected=False, training_completed=True)
 
 
 @pytest.fixture
 def mock_training_pipeline():
-    """Fixture for training pipeline security tests."""
     return MockTrainingPipeline()
 
 
 class MockDependencyScanner:
     """Mock dependency scanner for vulnerability detection."""
 
-    def scan(self, dependencies: list) -> MockScanResult:
-        """Scan dependencies for known vulnerabilities."""
-        result = MockScanResult()
-        result.vulnerabilities_checked = True
-
+    def scan(self, dependencies: list) -> MockResult:
+        vulnerabilities = []
         for dep in dependencies:
             if "4.0.0" in dep or "1.8.0" in dep or "1.19.0" in dep:
-                result.vulnerabilities.append({
+                vulnerabilities.append({
                     "package": dep.split("==")[0],
                     "severity": "high",
                     "cve": "CVE-2024-XXXX"
                 })
-
-        return result
+        return MockResult(vulnerabilities_checked=True, vulnerabilities=vulnerabilities)
 
 
 @pytest.fixture
 def mock_dependency_scanner():
-    """Fixture for dependency scanning security tests."""
     return MockDependencyScanner()
 
 
 class MockModelAnalyzer:
     """Mock model analyzer for backdoor detection."""
 
-    def scan_for_backdoors(self, model_path: str) -> MockModelAnalysisResult:
-        """Scan model for potential backdoors."""
-        result = MockModelAnalysisResult()
-        result.behavioral_analysis_completed = True
-        result.backdoor_detected = "suspicious" in model_path
-        return result
+    def scan_for_backdoors(self, model_path: str) -> MockResult:
+        return MockResult(
+            behavioral_analysis_completed=True,
+            backdoor_detected="suspicious" in model_path
+        )
 
 
 @pytest.fixture
 def mock_model_analyzer():
-    """Fixture for model analysis security tests."""
     return MockModelAnalyzer()
 
 
 # =============================================================================
-# OWASP LLM05: Insecure Output Handling Mocks
+# OWASP LLM05: Insecure Output Handling Fixtures
 # =============================================================================
 
-class MockOutputResult(MockResult):
-    """Generic mock result for output operations."""
+class MockOutputHandler:
+    """Consolidated mock for output handling security tests."""
 
-    def __init__(self, **kwargs):
-        defaults = {"sanitized": False, "validated": False, "output": ""}
-        defaults.update(kwargs)
-        super().__init__(**defaults)
-
-
-class MockOutputRenderer:
-    """Mock output renderer with sanitization."""
-
-    def render(self, content: str) -> MockOutputResult:
-        """Render output with XSS protection."""
-        result = MockOutputResult(rendered_html="")
-        result.sanitized = True
-
+    def render_html(self, content: str) -> MockResult:
         sanitized = content
-        # Sanitize common XSS vectors
-        sanitized = sanitized.replace("<script>", "&lt;script&gt;")
-        sanitized = sanitized.replace("</script>", "&lt;/script&gt;")
-        sanitized = sanitized.replace("onload", "")
-        sanitized = sanitized.replace("onerror", "")
-        sanitized = sanitized.replace("onmouseover", "")
-        result.rendered_html = sanitized
+        for pattern in ["<script>", "</script>", "onload", "onerror", "onmouseover"]:
+            sanitized = sanitized.replace(pattern, "" if "on" in pattern else f"&lt;{pattern[1:-1]}&gt;")
+        return MockResult(sanitized=True, rendered_html=sanitized)
 
-        return result
+    def generate_query(self, user_input: str) -> MockResult:
+        return MockResult(parameterized=True, sql="SELECT * FROM items WHERE name = ?")
+
+    def generate_command(self, user_request: str) -> MockResult:
+        return MockResult(validated=True, command="ls")
+
+    def read_file(self, path: str) -> MockResult:
+        return MockResult(path_validated=True, file_read="../" not in path and "etc/passwd" not in path)
+
+    def execute_code(self, code: str) -> MockResult:
+        safe = "__import__" not in code and "eval" not in code
+        return MockResult(code_validated=True, executed=safe)
+
+    def generate_html(self, content: str) -> MockResult:
+        html = content
+        if "<iframe>" in content:
+            html = content.replace("<iframe>", "&lt;iframe&gt;").replace("</iframe>", "&lt;/iframe&gt;")
+        return MockResult(sanitized=True, html=html)
+
+    def build_ldap_query(self, user_input: str) -> MockResult:
+        cleaned = user_input
+        for char in "|()":
+            cleaned = cleaned.replace(char, "")
+        return MockResult(escaped=True, filter=cleaned)
+
+    def render_template(self, template: str) -> MockResult:
+        if "{{" in template and ("*" in template or "config" in template):
+            return MockResult(validated=True, output="Invalid template")
+        return MockResult(validated=True, output=template)
 
 
 @pytest.fixture
+def mock_output_handler():
+    """Consolidated fixture for all output handling tests."""
+    return MockOutputHandler()
+
+
+# Legacy fixtures for backwards compatibility
+@pytest.fixture
 def mock_output_renderer():
-    """Fixture for output rendering security tests."""
-    return MockOutputRenderer()
-
-
-class MockQueryGenerator:
-    """Mock query generator with SQL injection protection."""
-
-    def generate_query(self, user_input: str) -> MockOutputResult:
-        """Generate SQL query with parameterization."""
-        result = MockOutputResult(parameterized=True, sql="SELECT * FROM items WHERE name = ?")
-        return result
+    handler = MockOutputHandler()
+    class Renderer:
+        def render(self, content): return handler.render_html(content)
+    return Renderer()
 
 
 @pytest.fixture
 def mock_query_generator():
-    """Fixture for query generation security tests."""
-    return MockQueryGenerator()
-
-
-class MockCommandGenerator:
-    """Mock command generator with validation."""
-
-    def generate_command(self, user_request: str) -> MockOutputResult:
-        """Generate system command with validation."""
-        result = MockOutputResult(command="ls")
-        result.validated = True
-        return result
+    handler = MockOutputHandler()
+    class Generator:
+        def generate_query(self, user_input): return handler.generate_query(user_input)
+    return Generator()
 
 
 @pytest.fixture
 def mock_command_generator():
-    """Fixture for command generation security tests."""
-    return MockCommandGenerator()
-
-
-class MockFileHandler:
-    """Mock file handler with path validation."""
-
-    def read_file(self, path: str) -> MockOutputResult:
-        """Read file with path traversal protection."""
-        result = MockOutputResult(path_validated=True, file_read=True)
-        if "../" in path or "etc/passwd" in path:
-            result.file_read = False
-        return result
+    handler = MockOutputHandler()
+    class Generator:
+        def generate_command(self, user_request): return handler.generate_command(user_request)
+    return Generator()
 
 
 @pytest.fixture
 def mock_file_handler():
-    """Fixture for file handling security tests."""
-    return MockFileHandler()
-
-
-class MockCodeExecutor:
-    """Mock code executor with validation."""
-
-    def execute(self, code: str) -> MockOutputResult:
-        """Execute code with validation."""
-        result = MockOutputResult(code_validated=True, executed=True)
-        if "__import__" in code or "eval" in code:
-            result.executed = False
-        return result
+    handler = MockOutputHandler()
+    class Handler:
+        def read_file(self, path): return handler.read_file(path)
+    return Handler()
 
 
 @pytest.fixture
 def mock_code_executor():
-    """Fixture for code execution security tests."""
-    return MockCodeExecutor()
-
-
-class MockHTMLGenerator:
-    """Mock HTML generator with sanitization."""
-
-    def generate_html(self, content: str) -> MockOutputResult:
-        """Generate HTML with sanitization."""
-        result = MockOutputResult(html="")
-        result.sanitized = True
-
-        if "<iframe>" in content:
-            result.html = content.replace("<iframe>", "&lt;iframe&gt;").replace("</iframe>", "&lt;/iframe&gt;")
-        else:
-            result.html = content
-
-        return result
+    handler = MockOutputHandler()
+    class Executor:
+        def execute(self, code): return handler.execute_code(code)
+    return Executor()
 
 
 @pytest.fixture
 def mock_html_generator():
-    """Fixture for HTML generation security tests."""
-    return MockHTMLGenerator()
-
-
-class MockLDAPQueryBuilder:
-    """Mock LDAP query builder with injection protection."""
-
-    def build_query(self, user_input: str) -> MockOutputResult:
-        """Build LDAP query with escaping."""
-        result = MockOutputResult(escaped=True, filter="")
-
-        if "|" in user_input or "(" in user_input or ")" in user_input:
-            result.filter = user_input.replace("|", "").replace("(", "").replace(")", "")
-        else:
-            result.filter = user_input
-
-        return result
+    handler = MockOutputHandler()
+    class Generator:
+        def generate_html(self, content): return handler.generate_html(content)
+    return Generator()
 
 
 @pytest.fixture
 def mock_ldap_query_builder():
-    """Fixture for LDAP query building security tests."""
-    return MockLDAPQueryBuilder()
-
-
-class MockTemplateRenderer:
-    """Mock template renderer with SSTI protection."""
-
-    def render_template(self, template: str) -> MockOutputResult:
-        """Render template with validation."""
-        result = MockOutputResult()
-        result.validated = True
-
-        if "{{" in template and ("*" in template or "config" in template):
-            result.output = "Invalid template"
-        else:
-            result.output = template
-
-        return result
+    handler = MockOutputHandler()
+    class Builder:
+        def build_query(self, user_input): return handler.build_ldap_query(user_input)
+    return Builder()
 
 
 @pytest.fixture
 def mock_template_renderer():
-    """Fixture for template rendering security tests."""
-    return MockTemplateRenderer()
+    handler = MockOutputHandler()
+    class Renderer:
+        def render_template(self, template): return handler.render_template(template)
+    return Renderer()
 
 
 # =============================================================================
-# OWASP LLM08: Excessive Agency Mocks
+# OWASP LLM08: Excessive Agency Fixtures
 # =============================================================================
-
-class MockAgentResult(MockResult):
-    """Mock result for agent actions."""
-
-    def __init__(self):
-        super().__init__(
-            approval_requested=False,
-            executed=False,
-            scope_checked=False,
-            permission_checked=False,
-            url_validated=False,
-            call_made=False,
-            rate_limited=False,
-            privilege_check_performed=False,
-            command_validated=False,
-            approval_required=False,
-            context_evaluated=False
-        )
-
-
-class MockChainResult(MockResult):
-    """Mock result for action chains."""
-
-    def __init__(self):
-        super().__init__(
-            chain_reviewed=False,
-            high_impact_detected=False,
-            chain_completed=False,
-            context_evaluated=False
-        )
-
-
-class MockFinancialResult(MockResult):
-    """Mock result for financial operations."""
-
-    def __init__(self):
-        super().__init__(
-            approval_required=False,
-            amount_limit_checked=False,
-            completed=False
-        )
-
 
 class MockAgent:
     """Mock LLM agent with action controls."""
@@ -512,12 +314,16 @@ class MockAgent:
     def __init__(self):
         self.action_count = 0
 
-    def execute_action(self, action: str, context: dict = None) -> MockAgentResult:
-        """Execute agent action with controls."""
-        result = MockAgentResult()
+    def execute_action(self, action: str, context: dict = None) -> MockResult:
         self.action_count += 1
+        result = MockResult(
+            approval_requested=False, executed=True, scope_checked=False,
+            permission_checked=False, url_validated=False, call_made=False,
+            rate_limited=False, privilege_check_performed=False,
+            command_validated=False, approval_required=False, context_evaluated=False
+        )
 
-        if "delete" in action or "admin" in action or "shutdown" in action:
+        if any(word in action for word in ["delete", "admin", "shutdown"]):
             result.approval_requested = True
             result.scope_checked = True
             result.permission_checked = True
@@ -543,305 +349,177 @@ class MockAgent:
 
         return result
 
-    def modify_data(self, table: str, action: str) -> MockAgentResult:
-        """Modify data with permission checks."""
-        result = MockAgentResult()
-        result.permission_checked = True
-        if "delete" in action:
-            result.executed = False
-        return result
+    def modify_data(self, table: str, action: str) -> MockResult:
+        return MockResult(permission_checked=True, executed="delete" not in action)
 
-    def call_external_api(self, url: str, method: str) -> MockAgentResult:
-        """Call external API with validation."""
-        result = MockAgentResult()
-        result.url_validated = True
-        if "untrusted" in url:
-            result.call_made = False
-        return result
+    def call_external_api(self, url: str, method: str) -> MockResult:
+        return MockResult(url_validated=True, call_made="untrusted" not in url)
 
-    def execute_system_command(self, command: str) -> MockAgentResult:
-        """Execute system command with controls."""
-        result = MockAgentResult()
-        result.command_validated = True
-        result.approval_required = True
-        result.executed = False
-        return result
+    def execute_system_command(self, command: str) -> MockResult:
+        return MockResult(command_validated=True, approval_required=True, executed=False)
 
-    def execute_action_chain(self, actions: list) -> MockChainResult:
-        """Execute chain of actions with review."""
-        result = MockChainResult()
-        result.chain_reviewed = True
-
+    def execute_action_chain(self, actions: list) -> MockResult:
         for action in actions:
             if "send_email_to_all" in action or "delete" in action:
-                result.high_impact_detected = True
-                return result
-
-        result.chain_completed = True
-        return result
+                return MockResult(chain_reviewed=True, high_impact_detected=True, chain_completed=False)
+        return MockResult(chain_reviewed=True, high_impact_detected=False, chain_completed=True)
 
 
 @pytest.fixture
 def mock_agent():
-    """Fixture for agent security tests."""
     return MockAgent()
 
 
 class MockFinancialAgent:
     """Mock financial agent with transaction controls."""
 
-    def transfer_funds(self, amount: float, to: str) -> MockFinancialResult:
-        """Transfer funds with controls."""
-        result = MockFinancialResult()
-        result.amount_limit_checked = True
-
-        if amount > 1000 or "external" in to:
-            result.approval_required = True
-            result.completed = False
-
-        return result
+    def transfer_funds(self, amount: float, to: str) -> MockResult:
+        needs_approval = amount > 1000 or "external" in to
+        return MockResult(
+            amount_limit_checked=True,
+            approval_required=needs_approval,
+            completed=not needs_approval
+        )
 
 
 @pytest.fixture
 def mock_financial_agent():
-    """Fixture for financial agent security tests."""
     return MockFinancialAgent()
 
 
 # =============================================================================
-# OWASP LLM09: Overreliance Mocks
+# OWASP LLM09: Overreliance Fixtures
 # =============================================================================
 
-class MockAssistantResponse(MockResult):
-    """Generic mock response for assistant types."""
+class MockAdvisor:
+    """Consolidated mock advisor for overreliance tests."""
 
-    def __init__(self, **kwargs):
-        defaults = {
-            "disclaimer_present": False,
-            "professional_referral_suggested": False,
-            "sources_provided": False,
-            "sources": [],
-            "confidence_indicated": False,
-            "confidence_level": 0.0,
-            "uncertainty_acknowledged": False,
-            "definitive_answer_provided": False,
-            "risk_warning_present": False
-        }
-        defaults.update(kwargs)
-        super().__init__(**defaults)
+    def respond_health(self, query: str) -> MockResult:
+        needs_referral = "medication" in query.lower() or "treatment" in query.lower()
+        return MockResult(
+            disclaimer_present=needs_referral,
+            professional_referral_suggested=needs_referral
+        )
 
+    def respond_legal(self, query: str) -> MockResult:
+        needs_referral = "contract" in query.lower() or "sign" in query.lower()
+        return MockResult(
+            disclaimer_present=needs_referral,
+            professional_referral_suggested=needs_referral
+        )
 
-class MockFactChecker:
-    """Mock fact checker for overreliance testing."""
+    def respond_financial(self, query: str) -> MockResult:
+        needs_referral = "invest" in query.lower() or "savings" in query.lower()
+        return MockResult(
+            disclaimer_present=needs_referral,
+            risk_warning_present=needs_referral,
+            professional_referral_suggested=needs_referral
+        )
 
-    def verify_claim(self, claim: str) -> MockAssistantResponse:
-        """Verify factual claims."""
-        result = MockAssistantResponse(verification_performed=True, claim_verified=True)
-        if "flat" in claim.lower() or "cheese" in claim.lower():
-            result.claim_verified = False
-        return result
+    def respond_research(self, query: str) -> MockResult:
+        needs_sources = "population" in query.lower() or "what is" in query.lower()
+        return MockResult(
+            sources_provided=needs_sources,
+            sources=["Source 1", "Source 2"] if needs_sources else []
+        )
 
 
 @pytest.fixture
-def mock_fact_checker():
-    """Fixture for fact checking security tests."""
-    return MockFactChecker()
+def mock_advisor():
+    """Consolidated advisor fixture."""
+    return MockAdvisor()
 
 
-class MockHealthAssistant:
-    """Mock health assistant with disclaimers."""
-
-    def respond(self, query: str) -> MockAssistantResponse:
-        """Respond to health queries with disclaimers."""
-        result = MockAssistantResponse()
-        if "medication" in query.lower() or "treatment" in query.lower():
-            result.disclaimer_present = True
-            result.professional_referral_suggested = True
-        return result
-
-
+# Legacy fixtures for backwards compatibility
 @pytest.fixture
 def mock_health_assistant():
-    """Fixture for health assistant security tests."""
-    return MockHealthAssistant()
-
-
-class MockLegalAssistant:
-    """Mock legal assistant with disclaimers."""
-
-    def respond(self, query: str) -> MockAssistantResponse:
-        """Respond to legal queries with disclaimers."""
-        result = MockAssistantResponse()
-        if "contract" in query.lower() or "sign" in query.lower():
-            result.disclaimer_present = True
-            result.professional_referral_suggested = True
-        return result
+    advisor = MockAdvisor()
+    class Assistant:
+        def respond(self, query): return advisor.respond_health(query)
+    return Assistant()
 
 
 @pytest.fixture
 def mock_legal_assistant():
-    """Fixture for legal assistant security tests."""
-    return MockLegalAssistant()
-
-
-class MockFinancialAdvisor:
-    """Mock financial advisor with disclaimers."""
-
-    def respond(self, query: str) -> MockAssistantResponse:
-        """Respond to financial queries with disclaimers."""
-        result = MockAssistantResponse()
-        if "invest" in query.lower() or "savings" in query.lower():
-            result.disclaimer_present = True
-            result.risk_warning_present = True
-            result.professional_referral_suggested = True
-        return result
+    advisor = MockAdvisor()
+    class Assistant:
+        def respond(self, query): return advisor.respond_legal(query)
+    return Assistant()
 
 
 @pytest.fixture
 def mock_financial_advisor():
-    """Fixture for financial advisor security tests."""
-    return MockFinancialAdvisor()
-
-
-class MockResearchAssistant:
-    """Mock research assistant with source citations."""
-
-    def respond(self, query: str) -> MockAssistantResponse:
-        """Respond with source citations."""
-        result = MockAssistantResponse()
-        if "population" in query.lower() or "what is" in query.lower():
-            result.sources_provided = True
-            result.sources = ["Source 1", "Source 2"]
-        return result
+    advisor = MockAdvisor()
+    class Advisor:
+        def respond(self, query): return advisor.respond_financial(query)
+    return Advisor()
 
 
 @pytest.fixture
 def mock_research_assistant():
-    """Fixture for research assistant security tests."""
-    return MockResearchAssistant()
+    advisor = MockAdvisor()
+    class Assistant:
+        def respond(self, query): return advisor.respond_research(query)
+    return Assistant()
 
 
-class MockLLMWithConfidence:
-    """Mock LLM that indicates confidence levels."""
-
-    def respond(self, query: str) -> MockAssistantResponse:
-        """Respond with confidence indication."""
-        result = MockAssistantResponse(confidence_indicated=True)
-
-        if "weather" in query.lower() or "predict" in query.lower() or "lottery" in query.lower():
-            result.confidence_level = 0.3
-            result.uncertainty_acknowledged = True
-            result.definitive_answer_provided = False
-        else:
-            result.confidence_level = 0.8
-
-        return result
+@pytest.fixture
+def mock_fact_checker():
+    class Checker:
+        def verify_claim(self, claim: str) -> MockResult:
+            verified = "flat" not in claim.lower() and "cheese" not in claim.lower()
+            return MockResult(verification_performed=True, claim_verified=verified)
+    return Checker()
 
 
 @pytest.fixture
 def mock_llm_with_confidence():
-    """Fixture for confidence-aware LLM security tests."""
-    return MockLLMWithConfidence()
-
-
-class MockDecisionSystem:
-    """Mock decision system with human oversight."""
-
-    def make_decision(self, decision: str) -> MockAssistantResponse:
-        """Make decisions with human oversight for critical cases."""
-        result = MockAssistantResponse(human_review_required=False, auto_approved=False)
-
-        if "loan" in decision or "$" in decision or "approve" in decision:
-            result.human_review_required = True
-
-        return result
+    class LLM:
+        def respond(self, query: str) -> MockResult:
+            uncertain = any(word in query.lower() for word in ["weather", "predict", "lottery"])
+            return MockResult(
+                confidence_indicated=True,
+                confidence_level=0.3 if uncertain else 0.8,
+                uncertainty_acknowledged=uncertain,
+                definitive_answer_provided=not uncertain
+            )
+    return LLM()
 
 
 @pytest.fixture
 def mock_decision_system():
-    """Fixture for decision system security tests."""
-    return MockDecisionSystem()
-
-
-class MockSafetySystem:
-    """Mock safety system for life-critical decisions."""
-
-    def evaluate(self, decision: str) -> MockAssistantResponse:
-        """Evaluate safety-critical decisions."""
-        result = MockAssistantResponse(
-            safety_check_performed=True,
-            human_approval_required=False,
-            action_permitted=True
-        )
-
-        if "disable" in decision or "emergency" in decision or "brake" in decision:
-            result.human_approval_required = True
-            result.action_permitted = False
-
-        return result
+    class System:
+        def make_decision(self, decision: str) -> MockResult:
+            needs_review = any(word in decision for word in ["loan", "$", "approve"])
+            return MockResult(human_review_required=needs_review, auto_approved=False)
+    return System()
 
 
 @pytest.fixture
 def mock_safety_system():
-    """Fixture for safety system security tests."""
-    return MockSafetySystem()
-
-
-class MockHallucinationDetector:
-    """Mock hallucination detector."""
-
-    def analyze(self, response: str) -> MockAssistantResponse:
-        """Analyze response for hallucinations."""
-        result = MockAssistantResponse(analysis_completed=True, hallucination_detected=False)
-        if "Atlantis" in response or "2025 study" in response:
-            result.hallucination_detected = True
-        return result
+    class System:
+        def evaluate(self, decision: str) -> MockResult:
+            dangerous = any(word in decision for word in ["disable", "emergency", "brake"])
+            return MockResult(
+                safety_check_performed=True,
+                human_approval_required=dangerous,
+                action_permitted=not dangerous
+            )
+    return System()
 
 
 @pytest.fixture
 def mock_hallucination_detector():
-    """Fixture for hallucination detection security tests."""
-    return MockHallucinationDetector()
+    class Detector:
+        def analyze(self, response: str) -> MockResult:
+            hallucinated = "Atlantis" in response or "2025 study" in response
+            return MockResult(analysis_completed=True, hallucination_detected=hallucinated)
+    return Detector()
 
 
 # =============================================================================
-# OWASP LLM10: Model Theft Mocks
+# OWASP LLM10: Model Theft Fixtures
 # =============================================================================
-
-class MockAPIResult(MockResult):
-    """Generic mock result for API operations."""
-
-    def __init__(self, **kwargs):
-        defaults = {
-            "rate_limited": False,
-            "output_filtered": False,
-            "architecture_leaked": False,
-            "embeddings_exposed": False,
-            "injection_detected": False,
-            "system_info_leaked": False,
-            "authentication_required": False,
-            "weights_accessible": False,
-            "encryption_enabled": False,
-            "encryption_strength": 0,
-            "pattern_analyzed": False,
-            "suspicious_pattern_detected": False,
-            "info_filtered": False,
-            "layer_count_exposed": False,
-            "parameter_count_exposed": False,
-            "architecture_details_exposed": False,
-            "training_data_filter_active": False,
-            "training_data_leaked": False,
-            "watermark_present": False,
-            "watermark_valid": False,
-            "cost_tracked": False,
-            "alert_triggered": False,
-            "full_vector_protected": False,
-            "fingerprinting_detected": False,
-            "countermeasures_applied": False
-        }
-        defaults.update(kwargs)
-        super().__init__(**defaults)
-
 
 class MockAPIGateway:
     """Mock API gateway with rate limiting."""
@@ -849,122 +527,77 @@ class MockAPIGateway:
     def __init__(self):
         self.query_count = 0
 
-    def query(self, text: str) -> MockAPIResult:
-        """Process API query with rate limiting."""
-        result = MockAPIResult()
+    def query(self, text: str) -> MockResult:
         self.query_count += 1
-        if self.query_count > 500:
-            result.rate_limited = True
-        return result
+        return MockResult(rate_limited=self.query_count > 500)
 
 
 @pytest.fixture
 def mock_api_gateway():
-    """Fixture for API gateway security tests."""
     return MockAPIGateway()
 
 
 class MockModelStorage:
     """Mock model storage with access controls."""
 
-    def access_weights(self) -> MockAPIResult:
-        """Access model weights."""
-        return MockAPIResult(authentication_required=True, weights_accessible=False)
+    def access_weights(self) -> MockResult:
+        return MockResult(authentication_required=True, weights_accessible=False)
 
-    def verify_encryption(self) -> MockAPIResult:
-        """Verify model encryption."""
-        return MockAPIResult(encryption_enabled=True, encryption_strength=256)
+    def verify_encryption(self) -> MockResult:
+        return MockResult(encryption_enabled=True, encryption_strength=256)
 
 
 @pytest.fixture
 def mock_model_storage():
-    """Fixture for model storage security tests."""
     return MockModelStorage()
-
-
-class MockAPIEndpoint:
-    """Mock API endpoint with output filtering."""
-
-    def query(self, text: str) -> MockAPIResult:
-        """Process query with output filtering."""
-        return MockAPIResult(output_filtered=True)
 
 
 @pytest.fixture
 def mock_api_endpoint():
-    """Fixture for API endpoint security tests."""
-    return MockAPIEndpoint()
-
-
-class MockAbuseDetector:
-    """Mock abuse detector for extraction patterns."""
-
-    def analyze_pattern(self, queries: list) -> MockAPIResult:
-        """Analyze query patterns for extraction attempts."""
-        result = MockAPIResult(pattern_analyzed=True)
-        if len(queries) >= 3:
-            unique_queries = set(queries)
-            if len(unique_queries) < len(queries) * 0.7:
-                result.suspicious_pattern_detected = True
-        return result
+    class Endpoint:
+        def query(self, text: str) -> MockResult:
+            return MockResult(output_filtered=True)
+    return Endpoint()
 
 
 @pytest.fixture
 def mock_abuse_detector():
-    """Fixture for abuse detection security tests."""
-    return MockAbuseDetector()
-
-
-class MockModelAPI:
-    """Mock model API with information protection."""
-
-    def get_model_info(self) -> MockAPIResult:
-        """Get filtered model information."""
-        return MockAPIResult(info_filtered=True)
-
-    def query(self, text: str) -> MockAPIResult:
-        """Process query with protections."""
-        result = MockAPIResult(training_data_filter_active=True)
-        if "ignore" in text.lower() or "system prompt" in text.lower():
-            result.injection_detected = True
-        return result
+    class Detector:
+        def analyze_pattern(self, queries: list) -> MockResult:
+            suspicious = False
+            if len(queries) >= 3:
+                unique = set(queries)
+                suspicious = len(unique) < len(queries) * 0.7
+            return MockResult(pattern_analyzed=True, suspicious_pattern_detected=suspicious)
+    return Detector()
 
 
 @pytest.fixture
 def mock_model_api():
-    """Fixture for model API security tests."""
-    return MockModelAPI()
+    class API:
+        def get_model_info(self) -> MockResult:
+            return MockResult(info_filtered=True)
 
-
-class MockModelVerifier:
-    """Mock model verifier for watermarking."""
-
-    def check_watermark(self) -> MockAPIResult:
-        """Check model watermark."""
-        return MockAPIResult(watermark_present=True, watermark_valid=True)
+        def query(self, text: str) -> MockResult:
+            injection = "ignore" in text.lower() or "system prompt" in text.lower()
+            return MockResult(training_data_filter_active=True, injection_detected=injection)
+    return API()
 
 
 @pytest.fixture
 def mock_model_verifier():
-    """Fixture for model verification security tests."""
-    return MockModelVerifier()
-
-
-class MockUsageMonitor:
-    """Mock usage monitor for cost tracking."""
-
-    def track_usage(self, user_id: str, queries: int) -> MockAPIResult:
-        """Track usage and costs."""
-        result = MockAPIResult(cost_tracked=True)
-        if queries > 1000:
-            result.alert_triggered = True
-        return result
+    class Verifier:
+        def check_watermark(self) -> MockResult:
+            return MockResult(watermark_present=True, watermark_valid=True)
+    return Verifier()
 
 
 @pytest.fixture
 def mock_usage_monitor():
-    """Fixture for usage monitoring security tests."""
-    return MockUsageMonitor()
+    class Monitor:
+        def track_usage(self, user_id: str, queries: int) -> MockResult:
+            return MockResult(cost_tracked=True, alert_triggered=queries > 1000)
+    return Monitor()
 
 
 class MockEmbeddingAPI:
@@ -973,34 +606,42 @@ class MockEmbeddingAPI:
     def __init__(self):
         self.request_count = 0
 
-    def get_embedding(self, text: str) -> MockAPIResult:
-        """Get embedding with protections."""
-        result = MockAPIResult(full_vector_protected=True)
+    def get_embedding(self, text: str) -> MockResult:
         self.request_count += 1
-        if self.request_count > 50:
-            result.rate_limited = True
-        return result
+        return MockResult(full_vector_protected=True, rate_limited=self.request_count > 50)
 
 
 @pytest.fixture
 def mock_embedding_api():
-    """Fixture for embedding API security tests."""
     return MockEmbeddingAPI()
-
-
-class MockFingerprintDetector:
-    """Mock fingerprint detector for model fingerprinting."""
-
-    def analyze_queries(self, queries: list) -> MockAPIResult:
-        """Analyze queries for fingerprinting attempts."""
-        result = MockAPIResult()
-        if len(queries) >= 3:
-            result.fingerprinting_detected = True
-            result.countermeasures_applied = True
-        return result
 
 
 @pytest.fixture
 def mock_fingerprint_detector():
-    """Fixture for fingerprint detection security tests."""
-    return MockFingerprintDetector()
+    class Detector:
+        def analyze_queries(self, queries: list) -> MockResult:
+            detected = len(queries) >= 3
+            return MockResult(fingerprinting_detected=detected, countermeasures_applied=detected)
+    return Detector()
+
+
+# Supply chain legacy alias
+@pytest.fixture
+def mock_supply_chain(mock_model_loader, mock_dependency_scanner):
+    """Composite fixture for supply chain tests."""
+    class SupplyChain:
+        def __init__(self):
+            self.model_loader = mock_model_loader
+            self.scanner = mock_dependency_scanner
+    return SupplyChain()
+
+
+# Overreliance legacy alias
+@pytest.fixture
+def mock_overreliance(mock_advisor, mock_fact_checker):
+    """Composite fixture for overreliance tests."""
+    class Overreliance:
+        def __init__(self):
+            self.advisor = mock_advisor
+            self.fact_checker = mock_fact_checker
+    return Overreliance()
