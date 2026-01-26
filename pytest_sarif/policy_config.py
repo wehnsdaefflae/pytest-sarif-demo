@@ -5,7 +5,7 @@ their security requirements, risk tolerance, and compliance needs.
 """
 
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set
 from pathlib import Path
 import json
 
@@ -66,8 +66,8 @@ class PolicyViolation:
     severity: str
     category: str
     message: str
-    current_value: any
-    threshold: any
+    current_value: Any
+    threshold: Any
     recommendation: str
 
 

@@ -4,7 +4,7 @@ Provides clean, actionable terminal output suitable for CI/CD pipelines,
 GitHub Actions, and automated security gates.
 """
 
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from .models import TestResult
 from .statistics import calculate_statistics, get_security_summary, get_test_severity
@@ -26,7 +26,7 @@ class Colors:
 
 def generate_console_summary(
     results: List[TestResult],
-    risk_score: Optional[any] = None,
+    risk_score: Optional[Any] = None,
     show_colors: bool = True,
     verbose: bool = False
 ) -> str:
@@ -163,7 +163,7 @@ def generate_console_summary(
 
 def print_console_summary(
     results: List[TestResult],
-    risk_score: Optional[any] = None,
+    risk_score: Optional[Any] = None,
     verbose: bool = False
 ) -> None:
     """Print console summary directly to stdout.

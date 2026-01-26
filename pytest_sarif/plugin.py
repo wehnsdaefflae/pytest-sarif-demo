@@ -12,7 +12,7 @@ from .trend_tracker import TrendTracker
 from .baseline_manager import BaselineManager
 from .policy_config import PolicyLoader, PolicyValidator
 from .risk_scorer import RiskScoringEngine
-from .statistics import calculate_statistics
+from .statistics import calculate_statistics, get_coverage_gaps
 
 
 class SARIFPlugin:
@@ -217,6 +217,15 @@ class SARIFPlugin:
                     f"  {category_id:<8} {name:<35} "
                     f"{cat_stats['total']:>5} {cat_stats['passed']:>5} {cat_stats['failed']:>5}"
                 )
+
+        # Coverage gap analysis
+        coverage = get_coverage_gaps(self.results)
+        if coverage["categories_untested"] > 0:
+            print(f"\nCoverage Gaps ({coverage['coverage_percent']}% of OWASP LLM Top 10):")
+            for gap in coverage["untested"]:
+                print(f"  - {gap['id']}: {gap['name']}")
+        else:
+            print(f"\nOWASP Coverage: 100% ({coverage['total_categories']}/{coverage['total_categories']} categories)")
 
         print(f"\nSARIF Report: {self.sarif_output}")
         print("=" * 70)

@@ -239,71 +239,6 @@ def mock_output_handler():
     return MockOutputHandler()
 
 
-# Legacy fixtures for backwards compatibility
-@pytest.fixture
-def mock_output_renderer():
-    handler = MockOutputHandler()
-    class Renderer:
-        def render(self, content): return handler.render_html(content)
-    return Renderer()
-
-
-@pytest.fixture
-def mock_query_generator():
-    handler = MockOutputHandler()
-    class Generator:
-        def generate_query(self, user_input): return handler.generate_query(user_input)
-    return Generator()
-
-
-@pytest.fixture
-def mock_command_generator():
-    handler = MockOutputHandler()
-    class Generator:
-        def generate_command(self, user_request): return handler.generate_command(user_request)
-    return Generator()
-
-
-@pytest.fixture
-def mock_file_handler():
-    handler = MockOutputHandler()
-    class Handler:
-        def read_file(self, path): return handler.read_file(path)
-    return Handler()
-
-
-@pytest.fixture
-def mock_code_executor():
-    handler = MockOutputHandler()
-    class Executor:
-        def execute(self, code): return handler.execute_code(code)
-    return Executor()
-
-
-@pytest.fixture
-def mock_html_generator():
-    handler = MockOutputHandler()
-    class Generator:
-        def generate_html(self, content): return handler.generate_html(content)
-    return Generator()
-
-
-@pytest.fixture
-def mock_ldap_query_builder():
-    handler = MockOutputHandler()
-    class Builder:
-        def build_query(self, user_input): return handler.build_ldap_query(user_input)
-    return Builder()
-
-
-@pytest.fixture
-def mock_template_renderer():
-    handler = MockOutputHandler()
-    class Renderer:
-        def render_template(self, template): return handler.render_template(template)
-    return Renderer()
-
-
 # =============================================================================
 # OWASP LLM08: Excessive Agency Fixtures
 # =============================================================================
@@ -430,39 +365,6 @@ def mock_advisor():
     return MockAdvisor()
 
 
-# Legacy fixtures for backwards compatibility
-@pytest.fixture
-def mock_health_assistant():
-    advisor = MockAdvisor()
-    class Assistant:
-        def respond(self, query): return advisor.respond_health(query)
-    return Assistant()
-
-
-@pytest.fixture
-def mock_legal_assistant():
-    advisor = MockAdvisor()
-    class Assistant:
-        def respond(self, query): return advisor.respond_legal(query)
-    return Assistant()
-
-
-@pytest.fixture
-def mock_financial_advisor():
-    advisor = MockAdvisor()
-    class Advisor:
-        def respond(self, query): return advisor.respond_financial(query)
-    return Advisor()
-
-
-@pytest.fixture
-def mock_research_assistant():
-    advisor = MockAdvisor()
-    class Assistant:
-        def respond(self, query): return advisor.respond_research(query)
-    return Assistant()
-
-
 @pytest.fixture
 def mock_fact_checker():
     class Checker:
@@ -556,7 +458,7 @@ def mock_model_storage():
 def mock_api_endpoint():
     class Endpoint:
         def query(self, text: str) -> MockResult:
-            return MockResult(output_filtered=True)
+            return MockResult(output_filtered=True, architecture_leaked=False, embeddings_exposed=False)
     return Endpoint()
 
 
@@ -576,11 +478,17 @@ def mock_abuse_detector():
 def mock_model_api():
     class API:
         def get_model_info(self) -> MockResult:
-            return MockResult(info_filtered=True)
+            return MockResult(
+                info_filtered=True, layer_count_exposed=False,
+                parameter_count_exposed=False, architecture_details_exposed=False
+            )
 
         def query(self, text: str) -> MockResult:
             injection = "ignore" in text.lower() or "system prompt" in text.lower()
-            return MockResult(training_data_filter_active=True, injection_detected=injection)
+            return MockResult(
+                training_data_filter_active=True, injection_detected=injection,
+                training_data_leaked=False, system_info_leaked=False
+            )
     return API()
 
 
@@ -623,25 +531,3 @@ def mock_fingerprint_detector():
             detected = len(queries) >= 3
             return MockResult(fingerprinting_detected=detected, countermeasures_applied=detected)
     return Detector()
-
-
-# Supply chain legacy alias
-@pytest.fixture
-def mock_supply_chain(mock_model_loader, mock_dependency_scanner):
-    """Composite fixture for supply chain tests."""
-    class SupplyChain:
-        def __init__(self):
-            self.model_loader = mock_model_loader
-            self.scanner = mock_dependency_scanner
-    return SupplyChain()
-
-
-# Overreliance legacy alias
-@pytest.fixture
-def mock_overreliance(mock_advisor, mock_fact_checker):
-    """Composite fixture for overreliance tests."""
-    class Overreliance:
-        def __init__(self):
-            self.advisor = mock_advisor
-            self.fact_checker = mock_fact_checker
-    return Overreliance()

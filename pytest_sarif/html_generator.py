@@ -145,10 +145,10 @@ class HTMLReportGenerator:
             "info": "#6c757d"
         }
 
-        total = sum(stats["severity"].values())
+        total = sum(stats["severity_distribution"].values())
 
         for severity in severity_order:
-            count = stats["severity"][severity]
+            count = stats["severity_distribution"][severity]
             percentage = (count / total * 100) if total > 0 else 0
             color = severity_colors[severity]
 

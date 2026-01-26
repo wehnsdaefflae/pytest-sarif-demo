@@ -87,7 +87,7 @@ class MarkdownReportGenerator:
         }
 
         for severity in severity_order:
-            count = stats["severity"][severity]
+            count = stats["severity_distribution"][severity]
             if count > 0:
                 emoji = severity_emoji[severity]
                 severity_table += f"| {severity.capitalize()} {emoji} | {count} | ![{severity}](https://img.shields.io/badge/{severity}-{count}-{self._get_severity_color(severity)}) |\n"

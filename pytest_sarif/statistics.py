@@ -3,7 +3,7 @@
 from typing import List, Dict, Set
 from collections import defaultdict
 from .models import TestResult
-from .owasp_metadata import get_owasp_category, get_owasp_markers_from_test
+from .owasp_metadata import get_owasp_category, get_owasp_markers_from_test, OWASP_LLM_CATEGORIES
 
 
 def get_test_severity(result: TestResult) -> str:
@@ -39,9 +39,6 @@ def calculate_statistics(results: List[TestResult]) -> Dict:
         "severity_distribution": defaultdict(int),
         "by_severity": defaultdict(lambda: {"total": 0, "failed": 0, "passed": 0}),
     }
-
-    # Alias for backward compatibility with HTML/Markdown templates
-    stats["severity"] = stats["severity_distribution"]
 
     for result in results:
         # Track OWASP category statistics
@@ -109,6 +106,46 @@ def get_security_summary(results: List[TestResult]) -> Dict:
         "owasp_categories_with_failures": categories_with_failures,
         "critical_high_failures": critical_high_failures,
         "security_posture": _assess_security_posture(stats)
+    }
+
+
+def get_coverage_gaps(results: List[TestResult]) -> Dict:
+    """Identify OWASP LLM Top 10 categories not covered by tests.
+
+    Returns a dictionary with tested categories, untested categories,
+    and coverage percentage. Essential for identifying blind spots in
+    security test suites.
+    """
+    tested_markers = get_owasp_markers(results)
+    all_markers = set(OWASP_LLM_CATEGORIES.keys())
+
+    untested_markers = all_markers - tested_markers
+    untested = []
+    for marker in sorted(untested_markers):
+        cat = OWASP_LLM_CATEGORIES[marker]
+        untested.append({
+            "marker": marker,
+            "id": cat.id,
+            "name": cat.name,
+            "description": cat.description,
+        })
+
+    tested = []
+    for marker in sorted(tested_markers):
+        cat = OWASP_LLM_CATEGORIES.get(marker)
+        if cat:
+            tested.append({"marker": marker, "id": cat.id, "name": cat.name})
+
+    total = len(all_markers)
+    covered = len(tested_markers & all_markers)
+
+    return {
+        "total_categories": total,
+        "categories_tested": covered,
+        "categories_untested": total - covered,
+        "coverage_percent": round((covered / total * 100), 1) if total > 0 else 0,
+        "tested": tested,
+        "untested": untested,
     }
 
 

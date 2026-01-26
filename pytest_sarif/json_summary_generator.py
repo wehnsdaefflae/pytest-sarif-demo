@@ -6,7 +6,7 @@ from typing import List, Dict, Any, Optional
 
 from .models import TestResult
 from .owasp_metadata import get_owasp_category, get_owasp_markers_from_test, get_cwe_tags
-from .statistics import calculate_statistics, get_test_severity
+from .statistics import calculate_statistics, get_test_severity, get_coverage_gaps
 
 
 class JSONSummaryGenerator:
@@ -59,7 +59,8 @@ class JSONSummaryGenerator:
             "severity_distribution": dict(stats["severity_distribution"]),
             "owasp_coverage": self._generate_owasp_coverage(results, stats),
             "test_results": self._generate_test_results(results),
-            "failures": self._generate_failures(results)
+            "failures": self._generate_failures(results),
+            "coverage_gaps": get_coverage_gaps(results)
         }
 
         # Add baseline comparison if available

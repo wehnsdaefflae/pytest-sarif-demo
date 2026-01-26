@@ -1,7 +1,7 @@
 """Report manager for generating multiple report formats."""
 
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, List, Optional
 import logging
 
 from .models import TestResult
@@ -50,10 +50,10 @@ class ReportManager:
         formats: List[str] = None,
         custom_paths: dict = None,
         trend_analytics: Optional[dict] = None,
-        baseline_analysis: Optional[any] = None,
-        risk_score: Optional[any] = None,
+        baseline_analysis: Optional[Any] = None,
+        risk_score: Optional[Any] = None,
         policy_violations: Optional[List] = None,
-        security_policy: Optional[any] = None
+        security_policy: Optional[Any] = None
     ) -> dict:
         """Generate reports in specified formats.
 

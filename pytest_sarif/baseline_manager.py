@@ -2,7 +2,7 @@
 
 import json
 from pathlib import Path
-from typing import List, Dict, Optional, Set, Tuple
+from typing import List, Dict, Optional
 from datetime import datetime
 from dataclasses import dataclass, field, asdict
 
@@ -266,22 +266,3 @@ class BaselineManager:
             return True
         return False
 
-    def get_baseline_info(self) -> Optional[Dict[str, any]]:
-        """Get baseline information summary.
-
-        Returns:
-            Dictionary with baseline info or None if no baseline
-        """
-        baseline = self.load_baseline()
-        if not baseline:
-            return None
-
-        return {
-            "timestamp": baseline.timestamp,
-            "total_tests": baseline.total_tests,
-            "passed_tests": baseline.passed_tests,
-            "failed_tests": baseline.failed_tests,
-            "pass_rate": (baseline.passed_tests / baseline.total_tests * 100) if baseline.total_tests > 0 else 0,
-            "metadata": baseline.metadata,
-            "file_path": str(self.baseline_file)
-        }
