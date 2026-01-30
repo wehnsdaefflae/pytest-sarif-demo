@@ -8,6 +8,7 @@ from .models import TestResult
 from .owasp_metadata import get_owasp_category, get_owasp_markers_from_test
 from .compliance_mapper import get_frameworks_covered, get_compliance_summary
 from .statistics import calculate_statistics, get_test_severity, get_owasp_markers
+from .constants import SEVERITY_ORDER, SEVERITY_COLORS_HEX, RISK_LEVEL_EMOJI
 
 # CSS is loaded from external file for maintainability
 _CSS_PATH = Path(__file__).parent / "static" / "report.css"
@@ -136,21 +137,12 @@ class HTMLReportGenerator:
         """Generate severity distribution section."""
         severity_html = '<div class="severity-bars">'
 
-        severity_order = ["critical", "high", "medium", "low", "info"]
-        severity_colors = {
-            "critical": "#dc3545",
-            "high": "#fd7e14",
-            "medium": "#ffc107",
-            "low": "#17a2b8",
-            "info": "#6c757d"
-        }
-
         total = sum(stats["severity_distribution"].values())
 
-        for severity in severity_order:
+        for severity in SEVERITY_ORDER:
             count = stats["severity_distribution"][severity]
             percentage = (count / total * 100) if total > 0 else 0
-            color = severity_colors[severity]
+            color = SEVERITY_COLORS_HEX[severity]
 
             severity_html += f"""
             <div class="severity-bar">
@@ -518,14 +510,7 @@ class HTMLReportGenerator:
         """Generate risk assessment section."""
         # Determine risk level styling
         risk_level_class = risk_score.risk_level
-        risk_level_icons = {
-            "critical": "🔴",
-            "high": "🟠",
-            "medium": "🟡",
-            "low": "🟢",
-            "minimal": "✅"
-        }
-        risk_icon = risk_level_icons.get(risk_score.risk_level, "⚪")
+        risk_icon = RISK_LEVEL_EMOJI.get(risk_score.risk_level, "⚪")
 
         # Generate top factors HTML
         top_factors = sorted(risk_score.factors.items(), key=lambda x: x[1], reverse=True)[:5]

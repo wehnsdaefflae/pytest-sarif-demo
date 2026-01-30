@@ -78,37 +78,6 @@ def get_owasp_markers(results: List[TestResult]) -> Set[str]:
     return all_markers
 
 
-def get_security_summary(results: List[TestResult]) -> Dict:
-    """Generate a high-level security summary for executive reporting.
-
-    Returns a concise summary suitable for dashboards and quick assessments.
-    """
-    stats = calculate_statistics(results)
-    owasp_markers = get_owasp_markers(results)
-
-    # Count categories with failures
-    categories_with_failures = sum(
-        1 for cat_stats in stats["owasp_categories"].values()
-        if cat_stats["failed"] > 0
-    )
-
-    # Count critical/high failures
-    critical_high_failures = (
-        stats["by_severity"].get("critical", {}).get("failed", 0) +
-        stats["by_severity"].get("high", {}).get("failed", 0)
-    )
-
-    return {
-        "pass_rate": stats["pass_rate"],
-        "total_tests": stats["total"],
-        "failed_tests": stats["failed"],
-        "owasp_categories_tested": len(stats["owasp_categories"]),
-        "owasp_categories_with_failures": categories_with_failures,
-        "critical_high_failures": critical_high_failures,
-        "security_posture": _assess_security_posture(stats)
-    }
-
-
 def get_coverage_gaps(results: List[TestResult]) -> Dict:
     """Identify OWASP LLM Top 10 categories not covered by tests.
 
@@ -147,22 +116,3 @@ def get_coverage_gaps(results: List[TestResult]) -> Dict:
         "tested": tested,
         "untested": untested,
     }
-
-
-def _assess_security_posture(stats: Dict) -> str:
-    """Assess overall security posture based on test results."""
-    if stats["failed"] == 0:
-        return "strong"
-
-    # Check for critical/high severity failures
-    critical_failed = stats["by_severity"].get("critical", {}).get("failed", 0)
-    high_failed = stats["by_severity"].get("high", {}).get("failed", 0)
-
-    if critical_failed > 0:
-        return "critical"
-    elif high_failed > 0:
-        return "needs_attention"
-    elif stats["pass_rate"] >= 80:
-        return "moderate"
-    else:
-        return "weak"

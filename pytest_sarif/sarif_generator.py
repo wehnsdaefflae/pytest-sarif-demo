@@ -17,6 +17,7 @@ from .compliance_mapper import (
     get_frameworks_covered,
     get_compliance_summary,
 )
+from .constants import SARIF_SEVERITY_MAP, SEVERITY_SCORES
 
 
 class SARIFGenerator:
@@ -24,14 +25,6 @@ class SARIFGenerator:
 
     SARIF_VERSION = "2.1.0"
     SARIF_SCHEMA = "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json"
-
-    SEVERITY_MAP = {
-        "critical": "error",
-        "high": "error",
-        "medium": "warning",
-        "low": "note",
-        "info": "none"
-    }
 
     def __init__(self, tool_name: str, tool_version: str, source_root: Path):
         self.tool_name = tool_name
@@ -302,25 +295,15 @@ class SARIFGenerator:
     def _get_severity_level(self, result: TestResult) -> str:
         """Extract severity level from test markers."""
         for marker in result.markers:
-            if marker in self.SEVERITY_MAP:
-                return self.SEVERITY_MAP[marker]
-
+            if marker in SARIF_SEVERITY_MAP:
+                return SARIF_SEVERITY_MAP[marker]
         return "warning"  # Default severity
 
     def _get_numeric_severity(self, result: TestResult) -> str:
         """Get numeric severity score for security tools."""
-        severity_scores = {
-            "critical": "9.0",
-            "high": "7.0",
-            "medium": "5.0",
-            "low": "3.0",
-            "info": "0.0",
-        }
-
         for marker in result.markers:
-            if marker in severity_scores:
-                return severity_scores[marker]
-
+            if marker in SEVERITY_SCORES:
+                return SEVERITY_SCORES[marker]
         return "5.0"  # Default medium severity
 
     def _generate_fixes(self, owasp_category) -> List[Dict[str, Any]]:

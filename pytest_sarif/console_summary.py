@@ -4,11 +4,12 @@ Provides clean, actionable terminal output suitable for CI/CD pipelines,
 GitHub Actions, and automated security gates.
 """
 
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional
 
 from .models import TestResult
-from .statistics import calculate_statistics, get_security_summary, get_test_severity
+from .statistics import calculate_statistics, get_test_severity
 from .owasp_metadata import get_owasp_markers_from_test, get_owasp_category
+from .constants import SEVERITY_ORDER
 
 
 # ANSI color codes for terminal output
@@ -22,6 +23,21 @@ class Colors:
     CYAN = "\033[96m"
     BOLD = "\033[1m"
     RESET = "\033[0m"
+
+
+def _assess_security_posture(stats: Dict) -> str:
+    """Assess overall security posture based on test results."""
+    if stats["failed"] == 0:
+        return "strong"
+    critical_failed = stats["by_severity"].get("critical", {}).get("failed", 0)
+    high_failed = stats["by_severity"].get("high", {}).get("failed", 0)
+    if critical_failed > 0:
+        return "critical"
+    elif high_failed > 0:
+        return "needs_attention"
+    elif stats["pass_rate"] >= 80:
+        return "moderate"
+    return "weak"
 
 
 def generate_console_summary(
@@ -42,7 +58,13 @@ def generate_console_summary(
         Formatted string for console output
     """
     stats = calculate_statistics(results)
-    summary = get_security_summary(results)
+
+    # Calculate security summary inline (avoids double stats calculation)
+    critical_high_failures = (
+        stats["by_severity"].get("critical", {}).get("failed", 0) +
+        stats["by_severity"].get("high", {}).get("failed", 0)
+    )
+    security_posture = _assess_security_posture(stats)
 
     # Color helpers
     c = Colors if show_colors else type('NoColor', (), {k: '' for k in dir(Colors) if not k.startswith('_')})()
@@ -60,7 +82,7 @@ def generate_console_summary(
     if stats["failed"] == 0:
         status = f"{c.GREEN}{c.BOLD}PASSED{c.RESET}"
         status_icon = f"{c.GREEN}[OK]{c.RESET}"
-    elif summary["critical_high_failures"] > 0:
+    elif critical_high_failures > 0:
         status = f"{c.RED}{c.BOLD}CRITICAL{c.RESET}"
         status_icon = f"{c.RED}[!!]{c.RESET}"
     else:
@@ -80,16 +102,16 @@ def generate_console_summary(
     lines.append("")
 
     # Severity breakdown (only if there are failures)
+    severity_colors = {
+        "critical": c.RED,
+        "high": c.MAGENTA,
+        "medium": c.YELLOW,
+        "low": c.BLUE,
+        "info": ""
+    }
     if stats["failed"] > 0:
         lines.append(f"  {c.CYAN}Severity Breakdown:{c.RESET}")
-        severity_colors = {
-            "critical": c.RED,
-            "high": c.MAGENTA,
-            "medium": c.YELLOW,
-            "low": c.BLUE,
-            "info": ""
-        }
-        for sev in ["critical", "high", "medium", "low", "info"]:
+        for sev in SEVERITY_ORDER:
             failed_count = stats["by_severity"].get(sev, {}).get("failed", 0)
             if failed_count > 0:
                 color = severity_colors[sev]
@@ -139,7 +161,6 @@ def generate_console_summary(
         lines.append("")
 
     # Security posture assessment
-    posture = summary["security_posture"]
     posture_messages = {
         "strong": f"{c.GREEN}Security posture is STRONG - all tests passing{c.RESET}",
         "critical": f"{c.RED}CRITICAL issues detected - immediate action required{c.RESET}",
@@ -147,7 +168,7 @@ def generate_console_summary(
         "moderate": f"{c.YELLOW}Some issues detected but manageable{c.RESET}",
         "weak": f"{c.RED}Multiple security failures - comprehensive review needed{c.RESET}"
     }
-    lines.append(f"  {posture_messages.get(posture, 'Unknown posture')}")
+    lines.append(f"  {posture_messages.get(security_posture, 'Unknown posture')}")
     lines.append("")
 
     # Footer with exit code hint

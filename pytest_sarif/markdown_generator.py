@@ -6,6 +6,7 @@ from typing import List, Dict
 from .models import TestResult
 from .owasp_metadata import get_owasp_category, get_owasp_markers_from_test
 from .statistics import calculate_statistics, get_test_severity
+from .constants import SEVERITY_ORDER, SEVERITY_EMOJI, SEVERITY_BADGE_COLORS
 
 
 class MarkdownReportGenerator:
@@ -77,20 +78,12 @@ class MarkdownReportGenerator:
 |----------|-------|-------|
 """
 
-        severity_order = ["critical", "high", "medium", "low", "info"]
-        severity_emoji = {
-            "critical": "🔴",
-            "high": "🟠",
-            "medium": "🟡",
-            "low": "🔵",
-            "info": "⚪"
-        }
-
-        for severity in severity_order:
+        for severity in SEVERITY_ORDER:
             count = stats["severity_distribution"][severity]
             if count > 0:
-                emoji = severity_emoji[severity]
-                severity_table += f"| {severity.capitalize()} {emoji} | {count} | ![{severity}](https://img.shields.io/badge/{severity}-{count}-{self._get_severity_color(severity)}) |\n"
+                emoji = SEVERITY_EMOJI[severity]
+                color = SEVERITY_BADGE_COLORS[severity]
+                severity_table += f"| {severity.capitalize()} {emoji} | {count} | ![{severity}](https://img.shields.io/badge/{severity}-{count}-{color}) |\n"
 
         return severity_table
 
@@ -174,7 +167,7 @@ Found **{len(failed_results)}** failing test(s):
 
         for i, result in enumerate(failed_results, 1):
             severity = get_test_severity(result)
-            severity_emoji = {"critical": "🔴", "high": "🟠", "medium": "🟡", "low": "🔵", "info": "⚪"}.get(severity, "⚪")
+            emoji = SEVERITY_EMOJI.get(severity, "⚪")
 
             owasp_markers = get_owasp_markers_from_test(result.markers)
             owasp_info = ""
@@ -198,7 +191,7 @@ Found **{len(failed_results)}** failing test(s):
 
             failures_section += f"""### {i}. {result.test_name}
 
-**Severity:** {severity_emoji} {severity.upper()}
+**Severity:** {emoji} {severity.upper()}
 **Location:** `{result.file_path}:{result.line_number}`{owasp_info}
 
 <details>
@@ -216,18 +209,6 @@ Found **{len(failed_results)}** failing test(s):
 """
 
         return failures_section
-
-
-    def _get_severity_color(self, severity: str) -> str:
-        """Get color code for severity badges."""
-        colors = {
-            "critical": "red",
-            "high": "orange",
-            "medium": "yellow",
-            "low": "blue",
-            "info": "lightgrey"
-        }
-        return colors.get(severity, "lightgrey")
 
     def _generate_baseline_section(self, baseline_analysis) -> str:
         """Generate baseline comparison section."""
