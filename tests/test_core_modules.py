@@ -1,9 +1,10 @@
 """Unit tests for core plugin modules.
 
-Tests the foundational components: models, statistics, and constants.
+Tests the foundational components: models, statistics, constants, and SARIF output.
 These tests validate the plugin's internal logic independent of pytest hooks.
 """
 
+import json
 import pytest
 from pytest_sarif.models import TestResult
 from pytest_sarif.statistics import (
@@ -21,6 +22,8 @@ from pytest_sarif.constants import (
     SEVERITY_BADGE_COLORS,
     RISK_LEVEL_EMOJI,
 )
+from pytest_sarif.sarif_generator import SARIFGenerator
+from pytest_sarif.console_summary import generate_console_summary
 
 
 # =============================================================================
@@ -429,3 +432,181 @@ class TestConstants:
         """Test risk levels have emoji mappings."""
         expected_levels = {"critical", "high", "medium", "low", "minimal"}
         assert set(RISK_LEVEL_EMOJI.keys()) == expected_levels
+
+
+# =============================================================================
+# SARIF Output Validation Tests
+# =============================================================================
+
+class TestSARIFGeneration:
+    """Tests for SARIF v2.1.0 output compliance."""
+
+    @pytest.fixture
+    def sample_results(self):
+        """Create sample test results for SARIF generation."""
+        return [
+            TestResult(
+                nodeid="tests/test_injection.py::test_basic_injection",
+                location=("tests/test_injection.py", 10, "test_basic_injection"),
+                outcome="failed",
+                longrepr="AssertionError: LLM responded to injection",
+                markers=["security", "owasp_llm01", "critical"],
+                duration=0.1,
+                properties={"docstring": "Test basic prompt injection defense."},
+            ),
+            TestResult(
+                nodeid="tests/test_injection.py::test_delimiter_injection",
+                location=("tests/test_injection.py", 25, "test_delimiter_injection"),
+                outcome="passed",
+                markers=["security", "owasp_llm01", "high"],
+                duration=0.05,
+            ),
+            TestResult(
+                nodeid="tests/test_data_leakage.py::test_pii_filter",
+                location=("tests/test_data_leakage.py", 15, "test_pii_filter"),
+                outcome="passed",
+                markers=["security", "owasp_llm02", "critical"],
+                duration=0.08,
+            ),
+        ]
+
+    def test_sarif_version(self, sample_results):
+        """Verify SARIF output uses version 2.1.0."""
+        generator = SARIFGenerator("pytest-sarif-demo", "0.1.0", source_root=".")
+        sarif_json = generator.generate(sample_results)
+        sarif = json.loads(sarif_json)
+        assert sarif["version"] == "2.1.0"
+
+    def test_sarif_schema_reference(self, sample_results):
+        """Verify SARIF output references the official schema."""
+        generator = SARIFGenerator("pytest-sarif-demo", "0.1.0", source_root=".")
+        sarif = json.loads(generator.generate(sample_results))
+        assert "$schema" in sarif
+        assert "sarif-schema-2.1.0" in sarif["$schema"]
+
+    def test_sarif_has_single_run(self, sample_results):
+        """Verify SARIF output contains exactly one run."""
+        generator = SARIFGenerator("pytest-sarif-demo", "0.1.0", source_root=".")
+        sarif = json.loads(generator.generate(sample_results))
+        assert len(sarif["runs"]) == 1
+
+    def test_sarif_tool_info(self, sample_results):
+        """Verify SARIF run contains correct tool information."""
+        generator = SARIFGenerator("pytest-sarif-demo", "0.1.0", source_root=".")
+        sarif = json.loads(generator.generate(sample_results))
+        tool = sarif["runs"][0]["tool"]["driver"]
+        assert tool["name"] == "pytest-sarif-demo"
+        assert tool["version"] == "0.1.0"
+
+    def test_sarif_results_only_failures(self, sample_results):
+        """Verify SARIF results only include failed tests."""
+        generator = SARIFGenerator("pytest-sarif-demo", "0.1.0", source_root=".")
+        sarif = json.loads(generator.generate(sample_results))
+        results = sarif["runs"][0]["results"]
+        assert len(results) == 1  # Only the failed test
+        assert results[0]["ruleId"] == "test_basic_injection"
+
+    def test_sarif_rules_include_all_tests(self, sample_results):
+        """Verify SARIF rules cover all unique tests."""
+        generator = SARIFGenerator("pytest-sarif-demo", "0.1.0", source_root=".")
+        sarif = json.loads(generator.generate(sample_results))
+        rules = sarif["runs"][0]["tool"]["driver"]["rules"]
+        rule_ids = {r["id"] for r in rules}
+        assert "test_basic_injection" in rule_ids
+        assert "test_delimiter_injection" in rule_ids
+        assert "test_pii_filter" in rule_ids
+
+    def test_sarif_severity_mapping(self, sample_results):
+        """Verify severity levels map correctly to SARIF levels."""
+        generator = SARIFGenerator("pytest-sarif-demo", "0.1.0", source_root=".")
+        sarif = json.loads(generator.generate(sample_results))
+        result = sarif["runs"][0]["results"][0]
+        assert result["level"] == "error"  # critical maps to error
+
+    def test_sarif_owasp_properties(self, sample_results):
+        """Verify OWASP metadata is included in SARIF properties."""
+        generator = SARIFGenerator("pytest-sarif-demo", "0.1.0", source_root=".")
+        sarif = json.loads(generator.generate(sample_results))
+        result = sarif["runs"][0]["results"][0]
+        assert result["properties"]["owasp_category"] == "LLM01"
+
+    def test_sarif_compliance_frameworks(self, sample_results):
+        """Verify compliance framework data is included in run properties."""
+        generator = SARIFGenerator("pytest-sarif-demo", "0.1.0", source_root=".")
+        sarif = json.loads(generator.generate(sample_results))
+        run_props = sarif["runs"][0].get("properties", {})
+        assert "compliance_frameworks" in run_props
+        assert run_props["compliance_frameworks"]["framework_count"] > 0
+
+    def test_sarif_artifacts(self, sample_results):
+        """Verify SARIF artifacts list test files."""
+        generator = SARIFGenerator("pytest-sarif-demo", "0.1.0", source_root=".")
+        sarif = json.loads(generator.generate(sample_results))
+        artifacts = sarif["runs"][0]["artifacts"]
+        artifact_uris = {a["location"]["uri"] for a in artifacts}
+        assert "tests/test_injection.py" in artifact_uris
+        assert "tests/test_data_leakage.py" in artifact_uris
+
+    def test_sarif_remediation_fixes(self, sample_results):
+        """Verify failed OWASP tests include remediation steps as SARIF fixes."""
+        generator = SARIFGenerator("pytest-sarif-demo", "0.1.0", source_root=".")
+        sarif = json.loads(generator.generate(sample_results))
+        result = sarif["runs"][0]["results"][0]
+        assert "fixes" in result
+        assert len(result["fixes"]) > 0
+
+
+# =============================================================================
+# Console Summary Tests
+# =============================================================================
+
+class TestConsoleSummary:
+    """Tests for the consolidated console summary output."""
+
+    @pytest.fixture
+    def sample_results(self):
+        """Create sample results for console summary testing."""
+        return [
+            TestResult(
+                nodeid="test::test_pass",
+                location=("test.py", 1, "test_pass"),
+                outcome="passed",
+                markers=["owasp_llm01", "critical"],
+            ),
+            TestResult(
+                nodeid="test::test_fail",
+                location=("test.py", 10, "test_fail"),
+                outcome="failed",
+                markers=["owasp_llm02", "high"],
+                longrepr="AssertionError",
+            ),
+        ]
+
+    def test_summary_contains_status(self, sample_results):
+        """Test console summary includes security status."""
+        output = generate_console_summary(sample_results, show_colors=False)
+        assert "Security Status" in output
+
+    def test_summary_contains_test_counts(self, sample_results):
+        """Test console summary includes test counts."""
+        output = generate_console_summary(sample_results, show_colors=False)
+        assert "Total:   2" in output
+        assert "Passed:  1" in output
+        assert "Failed:  1" in output
+
+    def test_summary_contains_owasp_categories(self, sample_results):
+        """Test console summary includes OWASP category table."""
+        output = generate_console_summary(sample_results, show_colors=False)
+        assert "OWASP LLM Categories" in output
+        assert "LLM01" in output
+        assert "LLM02" in output
+
+    def test_summary_no_colors_when_disabled(self, sample_results):
+        """Test ANSI codes are absent when colors disabled."""
+        output = generate_console_summary(sample_results, show_colors=False)
+        assert "\033[" not in output
+
+    def test_summary_includes_sarif_path(self, sample_results):
+        """Test console summary includes SARIF path when provided."""
+        output = generate_console_summary(sample_results, show_colors=False, sarif_path="results/test.sarif")
+        assert "results/test.sarif" in output

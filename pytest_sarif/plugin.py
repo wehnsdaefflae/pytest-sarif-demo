@@ -2,17 +2,17 @@
 
 import pytest
 from pathlib import Path
-from typing import List, Optional, Dict
+from typing import List, Optional
 
 from .sarif_generator import SARIFGenerator
 from .models import TestResult
-from .owasp_metadata import get_owasp_category
 from .report_manager import ReportManager
 from .trend_tracker import TrendTracker
 from .baseline_manager import BaselineManager
 from .policy_config import PolicyLoader, PolicyValidator
 from .risk_scorer import RiskScoringEngine
-from .statistics import calculate_statistics, get_coverage_gaps
+from .statistics import calculate_statistics
+from .console_summary import generate_console_summary
 
 
 class SARIFPlugin:
@@ -95,147 +95,12 @@ class SARIFPlugin:
 
             self.results.append(test_result)
 
-    def _generate_statistics(self) -> Dict:
-        """Generate statistics about OWASP category coverage."""
-        return calculate_statistics(self.results)
-
-    def _print_summary(
-        self,
-        stats: Dict,
-        trend_analytics: Optional[Dict] = None,
-        baseline_analysis=None,
-        risk_score=None,
-        policy_violations=None
-    ):
-        """Print comprehensive test summary with OWASP categories and trends."""
-        print("\n" + "=" * 70)
-        print("OWASP LLM Security Test Summary")
-        print("=" * 70)
-
-        # Overall statistics
-        print(f"\nTotal Tests:  {stats['total']}")
-        print(f"Passed:       {stats['passed']}")
-        print(f"Failed:       {stats['failed']}")
-
-        # Baseline comparison summary
-        if baseline_analysis:
-            print(f"\nBaseline Comparison:")
-            print(f"  Pass Rate:    {baseline_analysis.baseline_pass_rate:.1f}% → {baseline_analysis.current_pass_rate:.1f}% ({baseline_analysis.pass_rate_change:+.1f}%)")
-
-            if baseline_analysis.has_regressions:
-                print(f"  ⚠ Regressions: {baseline_analysis.regression_count} test(s) now failing")
-                if baseline_analysis.severity_impact:
-                    impacts = [f"{count} {sev}" for sev, count in sorted(baseline_analysis.severity_impact.items())]
-                    print(f"    Impact:     {', '.join(impacts)}")
-
-            if baseline_analysis.has_improvements:
-                print(f"  ✓ Fixed:      {baseline_analysis.improvement_count} test(s) now passing")
-
-            if baseline_analysis.added_tests:
-                print(f"  + New Tests:  {len(baseline_analysis.added_tests)}")
-
-            if baseline_analysis.removed_tests:
-                print(f"  - Removed:    {len(baseline_analysis.removed_tests)}")
-
-        # Trend analytics summary
-        if trend_analytics and trend_analytics.get("has_history"):
-            comparison = trend_analytics.get("comparison", {})
-
-            print(f"\nTrend Analysis:")
-            print(f"  Total Runs:   {trend_analytics['total_runs']}")
-            print(f"  Trend:        {comparison.get('trend', 'unknown').upper()}")
-            print(f"  Pass Rate:    {comparison.get('pass_rate_change', 0):+.2f}%")
-
-            # Show flaky tests warning
-            flakiness = trend_analytics.get("flakiness", {})
-            if flakiness.get("count", 0) > 0:
-                print(f"  ⚠ Flaky:      {flakiness['count']} test(s) detected")
-
-        # Risk scoring summary
-        if risk_score:
-            print(f"\nRisk Assessment:")
-            print(f"  Overall Risk: {risk_score.risk_level.upper()} ({risk_score.overall_score:.1f}/100)")
-            print(f"  Confidence:   {risk_score.confidence * 100:.0f}%")
-
-            # Show top risk factors
-            top_factors = sorted(
-                risk_score.factors.items(),
-                key=lambda x: x[1],
-                reverse=True
-            )[:3]
-
-            if top_factors:
-                print(f"  Top Factors:")
-                for factor, value in top_factors:
-                    if value > 10:  # Only show significant factors
-                        factor_name = factor.replace('_', ' ').title()
-                        print(f"    - {factor_name}: {value:.1f}/100")
-
-            # Show top recommendations
-            if risk_score.recommendations:
-                print(f"\n  Recommendations:")
-                for rec in risk_score.recommendations[:2]:  # Top 2 recommendations
-                    print(f"    • {rec}")
-
-        # Policy compliance summary
-        if policy_violations is not None:
-            if len(policy_violations) > 0:
-                print(f"\n⚠ Security Policy Violations: {len(policy_violations)}")
-                print(f"  Critical:     {sum(1 for v in policy_violations if v.severity == 'critical')}")
-                print(f"  High:         {sum(1 for v in policy_violations if v.severity == 'high')}")
-                print(f"  Medium:       {sum(1 for v in policy_violations if v.severity == 'medium')}")
-
-                # Show critical violations
-                critical_violations = [v for v in policy_violations if v.severity == "critical"]
-                if critical_violations:
-                    print(f"\n  Critical Violations:")
-                    for v in critical_violations[:3]:  # Show top 3
-                        print(f"    • {v.message}: {v.current_value} > {v.threshold}")
-            else:
-                print(f"\n✓ Security Policy: COMPLIANT")
-
-        # Severity distribution
-        if stats["severity_distribution"]:
-            print("\nSeverity Distribution:")
-            for severity in ["critical", "high", "medium", "low", "info"]:
-                count = stats["severity_distribution"].get(severity, 0)
-                if count > 0:
-                    print(f"  {severity.capitalize():12s} {count:3d}")
-
-        # OWASP category breakdown
-        if stats["owasp_categories"]:
-            print("\nOWASP LLM Categories:")
-            print(f"  {'Category':<8} {'Name':<35} {'Total':>5} {'Pass':>5} {'Fail':>5}")
-            print("  " + "-" * 65)
-
-            for category_id in sorted(stats["owasp_categories"].keys()):
-                cat_stats = stats["owasp_categories"][category_id]
-                category = get_owasp_category(f"owasp_{category_id.lower()}")
-                name = category.name if category else "Unknown"
-
-                print(
-                    f"  {category_id:<8} {name:<35} "
-                    f"{cat_stats['total']:>5} {cat_stats['passed']:>5} {cat_stats['failed']:>5}"
-                )
-
-        # Coverage gap analysis
-        coverage = get_coverage_gaps(self.results)
-        if coverage["categories_untested"] > 0:
-            print(f"\nCoverage Gaps ({coverage['coverage_percent']}% of OWASP LLM Top 10):")
-            for gap in coverage["untested"]:
-                print(f"  - {gap['id']}: {gap['name']}")
-        else:
-            print(f"\nOWASP Coverage: 100% ({coverage['total_categories']}/{coverage['total_categories']} categories)")
-
-        print(f"\nSARIF Report: {self.sarif_output}")
-        print("=" * 70)
-
     @pytest.hookimpl(trylast=True)
     def pytest_sessionfinish(self, session, exitstatus):
         """Generate reports at end of session."""
         if self.results:
-            # Generate and print statistics
-            stats = self._generate_statistics()
+            # Generate statistics
+            stats = calculate_statistics(self.results)
 
             # Get trend analytics if enabled
             trend_analytics = None
@@ -269,7 +134,14 @@ class SARIFPlugin:
                 stats["policy_compliant"] = policy_compliant
                 stats["policy_violations"] = len(policy_violations)
 
-            self._print_summary(stats, trend_analytics, baseline_analysis, risk_score, policy_violations)
+            print(generate_console_summary(
+                self.results,
+                risk_score=risk_score,
+                trend_analytics=trend_analytics,
+                baseline_analysis=baseline_analysis,
+                policy_violations=policy_violations,
+                sarif_path=str(self.sarif_output),
+            ))
 
             # Save or update baseline if requested
             if self.baseline_save or (self.baseline_update and baseline_analysis):

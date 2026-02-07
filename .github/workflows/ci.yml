@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Run security tests with SARIF output
+        run: |
+          pytest tests/ --sarif-output=results/pytest-results.sarif -v
+
+      - name: Validate SARIF schema compliance
+        run: |
+          python -c "
+          import json, jsonschema
+          with open('results/pytest-results.sarif') as f:
+              sarif = json.load(f)
+          assert sarif['version'] == '2.1.0', 'SARIF version mismatch'
+          assert len(sarif['runs']) == 1, 'Expected exactly one run'
+          run = sarif['runs'][0]
+          assert 'tool' in run and 'results' in run, 'Missing required SARIF fields'
+          print(f'SARIF valid: {len(run[\"results\"])} findings, {len(run[\"tool\"][\"driver\"][\"rules\"])} rules')
+          "
+
+      - name: Upload SARIF to GitHub Security
+        if: github.event_name == 'push' && matrix.python-version == '3.12'
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: results/pytest-results.sarif
+          category: llm-security-tests
+        continue-on-error: true
+
+      - name: Generate multi-format reports
+        run: |
+          pytest tests/ \
+            --sarif-output=results/pytest-results.sarif \
+            --report-formats=html,json,markdown \
+            --report-dir=results \
+            -v
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-reports-py${{ matrix.python-version }}
+          path: results/
+          retention-days: 30

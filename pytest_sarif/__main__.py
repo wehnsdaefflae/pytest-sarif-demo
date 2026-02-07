@@ -16,7 +16,6 @@ import subprocess
 from pathlib import Path
 
 from .owasp_metadata import OWASP_LLM_CATEGORIES
-from .statistics import get_coverage_gaps
 
 
 def print_banner():
