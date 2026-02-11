@@ -75,8 +75,6 @@ class BaselineSnapshot:
 class RegressionAnalysis:
     """Analysis of test regressions and improvements."""
 
-    new_failures: List[str] = field(default_factory=list)  # Tests that now fail
-    new_passes: List[str] = field(default_factory=list)    # Tests that now pass
     fixed_tests: List[str] = field(default_factory=list)   # Previously failing, now passing
     regressed_tests: List[str] = field(default_factory=list)  # Previously passing, now failing
     removed_tests: List[str] = field(default_factory=list)  # Tests in baseline but not current
@@ -164,10 +162,6 @@ class BaselineManager:
         except (json.JSONDecodeError, KeyError, TypeError):
             return None
 
-    def has_baseline(self) -> bool:
-        """Check if baseline exists."""
-        return self.baseline_file.exists()
-
     def compare_with_baseline(self, current_results: List[TestResult]) -> Optional[RegressionAnalysis]:
         """Compare current results with baseline.
 
@@ -195,8 +189,6 @@ class BaselineManager:
         # Analyze regressions and improvements
         regressed_tests = []
         fixed_tests = []
-        new_failures = []
-        new_passes = []
 
         severity_impact: Dict[str, int] = {}
         owasp_impact: Dict[str, int] = {}
@@ -222,12 +214,6 @@ class BaselineManager:
             elif baseline_outcome == "failed" and current_outcome == "passed":
                 fixed_tests.append(test_id)
 
-            # Track all failures and passes
-            if current_outcome == "failed":
-                new_failures.append(test_id)
-            elif current_outcome == "passed":
-                new_passes.append(test_id)
-
         # Calculate pass rates
         baseline_pass_rate = (baseline.passed_tests / baseline.total_tests * 100) if baseline.total_tests > 0 else 0
         current_pass_rate = (current.passed_tests / current.total_tests * 100) if current.total_tests > 0 else 0
@@ -237,8 +223,6 @@ class BaselineManager:
         improvement_count = len(fixed_tests)
 
         return RegressionAnalysis(
-            new_failures=new_failures,
-            new_passes=new_passes,
             fixed_tests=fixed_tests,
             regressed_tests=regressed_tests,
             removed_tests=removed_tests,
@@ -254,15 +238,4 @@ class BaselineManager:
             has_improvements=improvement_count > 0
         )
 
-    def delete_baseline(self) -> bool:
-        """Delete baseline file.
-
-        Returns:
-            True if deleted, False if not exists
-        """
-        if self.baseline_file.exists():
-            self.baseline_file.unlink()
-            self._baseline = None
-            return True
-        return False
 

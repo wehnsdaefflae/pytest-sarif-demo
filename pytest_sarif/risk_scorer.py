@@ -37,15 +37,15 @@ class RiskScoringEngine:
         "info": 0.5,
     }
 
-    # OWASP category risk multipliers (based on real-world impact)
+    # OWASP LLM Top 10 category risk multipliers (based on real-world impact)
     CATEGORY_MULTIPLIERS = {
-        "owasp_llm01": 1.5,  # Prompt Injection - very dangerous
-        "owasp_llm02": 1.4,  # Insecure Output Handling
-        "owasp_llm03": 1.3,  # Training Data Poisoning
+        "owasp_llm01": 1.5,  # Prompt Injection
+        "owasp_llm02": 1.4,  # Sensitive Information Disclosure
+        "owasp_llm03": 1.3,  # Supply Chain Vulnerabilities
         "owasp_llm04": 1.2,  # Model Denial of Service
-        "owasp_llm05": 1.3,  # Supply Chain Vulnerabilities
-        "owasp_llm06": 1.4,  # Sensitive Information Disclosure
-        "owasp_llm07": 1.3,  # Insecure Plugin Design
+        "owasp_llm05": 1.3,  # Insecure Output Handling
+        "owasp_llm06": 1.4,  # Insecure Plugin/Tool Use
+        "owasp_llm07": 1.3,  # System Prompt Leakage
         "owasp_llm08": 1.5,  # Excessive Agency
         "owasp_llm09": 1.2,  # Overreliance
         "owasp_llm10": 1.2,  # Model Theft

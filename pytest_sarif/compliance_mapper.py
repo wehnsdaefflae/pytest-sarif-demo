@@ -149,25 +149,6 @@ def get_frameworks_covered(owasp_markers: List[str]) -> Set[str]:
     return frameworks
 
 
-def get_framework_coverage(
-    owasp_markers: List[str], framework: str
-) -> List[ComplianceMapping]:
-    """Get all controls covered for a specific framework.
-
-    Args:
-        owasp_markers: List of OWASP markers from test results
-        framework: Framework name to filter by
-
-    Returns:
-        List of compliance mappings for the specified framework
-    """
-    coverage = []
-    for marker in owasp_markers:
-        mappings = get_compliance_mappings(marker)
-        coverage.extend([m for m in mappings if m.framework == framework])
-    return coverage
-
-
 def get_compliance_summary(owasp_markers: List[str]) -> Dict[str, Dict[str, int]]:
     """Generate summary of compliance coverage across frameworks.
 
@@ -181,7 +162,11 @@ def get_compliance_summary(owasp_markers: List[str]) -> Dict[str, Dict[str, int]
     frameworks = get_frameworks_covered(owasp_markers)
 
     for framework in frameworks:
-        coverage = get_framework_coverage(owasp_markers, framework)
+        coverage = []
+        for marker in owasp_markers:
+            mappings = get_compliance_mappings(marker)
+            coverage.extend(m for m in mappings if m.framework == framework)
+
         unique_controls = set((m.control_id, m.control_name) for m in coverage)
 
         summary[framework] = {

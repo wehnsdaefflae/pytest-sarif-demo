@@ -24,6 +24,7 @@ from pytest_sarif.constants import (
 )
 from pytest_sarif.sarif_generator import SARIFGenerator
 from pytest_sarif.console_summary import generate_console_summary
+from pytest_sarif.risk_scorer import RiskScoringEngine
 
 
 # =============================================================================
@@ -610,3 +611,89 @@ class TestConsoleSummary:
         """Test console summary includes SARIF path when provided."""
         output = generate_console_summary(sample_results, show_colors=False, sarif_path="results/test.sarif")
         assert "results/test.sarif" in output
+
+
+# =============================================================================
+# Risk Scoring Engine Tests
+# =============================================================================
+
+class TestRiskScoringEngine:
+    """Tests for the risk scoring engine."""
+
+    @pytest.fixture
+    def engine(self):
+        return RiskScoringEngine()
+
+    @pytest.fixture
+    def all_passing_results(self):
+        return [
+            TestResult(
+                nodeid=f"test::test_pass{i}",
+                location=("test.py", i, f"test_pass{i}"),
+                outcome="passed",
+                markers=["owasp_llm01", "critical"],
+                duration=0.1,
+            )
+            for i in range(10)
+        ]
+
+    @pytest.fixture
+    def mixed_results(self):
+        results = []
+        for i in range(5):
+            results.append(TestResult(
+                nodeid=f"test::test_pass{i}",
+                location=("test.py", i, f"test_pass{i}"),
+                outcome="passed",
+                markers=["owasp_llm01", "medium"],
+                duration=0.1,
+            ))
+        for i in range(5):
+            results.append(TestResult(
+                nodeid=f"test::test_fail{i}",
+                location=("test.py", 10 + i, f"test_fail{i}"),
+                outcome="failed",
+                markers=["owasp_llm02", "critical"],
+                duration=0.1,
+            ))
+        return results
+
+    def test_minimal_risk_all_passing(self, engine, all_passing_results):
+        """All-passing results produce minimal risk."""
+        stats = calculate_statistics(all_passing_results)
+        score = engine.calculate_risk(all_passing_results, stats)
+        assert score.risk_level == "minimal"
+        assert score.overall_score < 20
+
+    def test_high_risk_many_failures(self, engine, mixed_results):
+        """50% critical failures produce elevated risk."""
+        stats = calculate_statistics(mixed_results)
+        score = engine.calculate_risk(mixed_results, stats)
+        assert score.overall_score > 20
+        assert score.risk_level in ("medium", "high", "critical")
+
+    def test_risk_level_thresholds(self, engine):
+        """Risk level boundaries are correct."""
+        assert engine._determine_risk_level(85) == "critical"
+        assert engine._determine_risk_level(65) == "high"
+        assert engine._determine_risk_level(45) == "medium"
+        assert engine._determine_risk_level(25) == "low"
+        assert engine._determine_risk_level(10) == "minimal"
+
+    def test_confidence_increases_with_data(self, engine):
+        """Confidence is higher with more data sources."""
+        low = engine._calculate_confidence(5, False, False)
+        high = engine._calculate_confidence(50, True, True)
+        assert high > low
+
+    def test_recommendations_generated(self, engine, mixed_results):
+        """Recommendations are non-empty."""
+        stats = calculate_statistics(mixed_results)
+        score = engine.calculate_risk(mixed_results, stats)
+        assert len(score.recommendations) > 0
+
+    def test_category_scores_populated(self, engine, mixed_results):
+        """Category scores are calculated for tested categories."""
+        stats = calculate_statistics(mixed_results)
+        score = engine.calculate_risk(mixed_results, stats)
+        assert len(score.category_scores) > 0

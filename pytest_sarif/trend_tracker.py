@@ -7,7 +7,7 @@ from typing import List, Dict, Any, Optional
 from collections import defaultdict
 
 from .models import TestResult
-from .statistics import calculate_statistics, get_test_severity
+from .statistics import calculate_statistics
 
 
 class TrendTracker:
@@ -75,7 +75,7 @@ class TrendTracker:
             "current_run": current_summary,
             "comparison": self._compare_with_previous(current_summary, previous_runs[-1]["summary"]),
             "trends": self._calculate_trends(previous_runs),
-            "flakiness": self._detect_flaky_tests(previous_runs, results),
+            "flakiness": self._detect_flaky_tests(previous_runs),
             "improvement_rate": self._calculate_improvement_rate(previous_runs),
             "owasp_category_trends": self._calculate_owasp_trends(previous_runs)
         }
@@ -185,7 +185,7 @@ class TrendTracker:
         else:
             return "stable"
 
-    def _detect_flaky_tests(self, runs: List[Dict], current_results: List[TestResult]) -> Dict[str, Any]:
+    def _detect_flaky_tests(self, runs: List[Dict]) -> Dict[str, Any]:
         """Detect potentially flaky tests (tests that alternate between pass/fail)."""
         if len(runs) < 3:
             return {"flaky_tests": [], "message": "Need at least 3 runs to detect flakiness"}

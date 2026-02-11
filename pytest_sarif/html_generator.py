@@ -1,5 +1,6 @@
 """HTML report generator for pytest security test results."""
 
+import html as html_mod
 from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Optional
@@ -728,14 +729,10 @@ class HTMLReportGenerator:
         </section>"""
 
 
-    def _escape_html(self, text: str) -> str:
+    @staticmethod
+    def _escape_html(text: str) -> str:
         """Escape HTML special characters."""
-        return (text
-                .replace("&", "&amp;")
-                .replace("<", "&lt;")
-                .replace(">", "&gt;")
-                .replace('"', "&quot;")
-                .replace("'", "&#39;"))
+        return html_mod.escape(text, quote=True)
 
     def _get_css(self) -> str:
         """Load CSS styles from external file."""
@@ -744,20 +741,15 @@ class HTMLReportGenerator:
         # Minimal fallback if file missing
         return "body { font-family: sans-serif; }"
 
-    def _get_javascript(self) -> str:
+    @staticmethod
+    def _get_javascript() -> str:
         """Get JavaScript for interactive features."""
         return """
-// Add any interactive features here
-console.log('Security Test Report loaded successfully');
-
-// Add smooth scrolling for internal links
 document.querySelectorAll('a[href^="#"]').forEach(anchor => {
     anchor.addEventListener('click', function (e) {
         e.preventDefault();
         const target = document.querySelector(this.getAttribute('href'));
-        if (target) {
-            target.scrollIntoView({ behavior: 'smooth' });
-        }
+        if (target) target.scrollIntoView({ behavior: 'smooth' });
     });
 });
 """

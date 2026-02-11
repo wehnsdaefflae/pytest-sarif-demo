@@ -69,6 +69,7 @@ class SARIFPlugin:
             self.security_policy = PolicyLoader.load_default()
 
         self.enable_policy = config.getoption("--enable-policy", False)
+        self.risk_threshold = config.getoption("--risk-threshold", None)
         self.risk_scorer = RiskScoringEngine()
 
     @pytest.hookimpl(hookwrapper=True)
@@ -191,6 +192,16 @@ class SARIFPlugin:
                 for format_name, file_path in generated_files.items():
                     print(f"  {format_name.upper():12s} {file_path}")
                 print("=" * 70)
+
+            # Exit with error if risk score exceeds threshold
+            if self.risk_threshold is not None and risk_score.overall_score > self.risk_threshold:
+                print("\n" + "=" * 70)
+                print(
+                    f"❌ BUILD FAILED: Risk score {risk_score.overall_score:.1f} "
+                    f"exceeds threshold {self.risk_threshold:.1f}"
+                )
+                print("=" * 70)
+                session.exitstatus = 1
 
             # Exit with error if policy violations and enforcement is enabled
             if self.enable_policy and policy_violations:
@@ -334,6 +345,14 @@ def pytest_addoption(parser):
         dest="enable_policy",
         default=False,
         help="Enable security policy validation and enforcement"
+    )
+    group.addoption(
+        "--risk-threshold",
+        action="store",
+        dest="risk_threshold",
+        type=float,
+        default=None,
+        help="Maximum acceptable risk score (0-100). Build fails if exceeded."
     )
 
     parser.addini(
